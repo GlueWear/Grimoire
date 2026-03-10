@@ -1,0 +1,4710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRIMOIRE</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --amber: #ffaa00;
+      --amber-glow: rgba(255, 170, 0, 0.6);
+      --green: #00ff88;
+      --green-glow: rgba(0, 255, 136, 0.6);
+      --blue: #00ddff;
+      --blue-glow: rgba(0, 221, 255, 0.6);
+      --bg-dark: #0a0a0a;
+      --text-main: #cccccc;
+      --scanline: rgba(0, 0, 0, 0.3);
+    }
+    
+    body {
+      font-family: 'VT323', monospace;
+      background: var(--bg-dark);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      color: var(--text-main);
+    }
+    
+    /* CRT scanline effect */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        var(--scanline) 0px,
+        var(--scanline) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.3;
+    }
+    
+    /* Subtle flicker */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 255, 136, 0.015);
+      pointer-events: none;
+      z-index: 999;
+      animation: flicker 0.1s infinite;
+    }
+    
+    @keyframes flicker {
+      0%, 100% { opacity: 0.97; }
+      50% { opacity: 1; }
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 500px;
+      padding: 40px;
+      text-align: center;
+    }
+    
+    .logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 3.5rem;
+      letter-spacing: 0.3em;
+      margin-left: 0.3em; /* Compensate for letter-spacing on last letter */
+      margin-bottom: 0.5rem;
+      color: var(--amber);
+      text-shadow: 0 0 10px var(--amber-glow), 0 0 20px var(--amber-glow), 0 0 40px var(--amber-glow);
+      animation: glow-pulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes glow-pulse {
+      0%, 100% { text-shadow: 0 0 10px var(--amber-glow), 0 0 20px var(--amber-glow), 0 0 40px var(--amber-glow); }
+      50% { text-shadow: 0 0 15px var(--amber-glow), 0 0 30px var(--amber-glow), 0 0 60px var(--amber-glow); }
+    }
+    
+    .tagline {
+      font-size: 1.2rem;
+      color: #666;
+      margin-bottom: 3rem;
+      letter-spacing: 0.2em;
+    }
+    
+    .login-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .section-label {
+      font-size: 1.1rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.1em;
+    }
+    
+    .login-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .login-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1.4rem;
+      padding: 1rem 2rem;
+      border: 2px solid;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.1em;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .login-btn::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      transition: left 0.5s ease;
+    }
+    
+    .login-btn:hover::before {
+      left: 100%;
+    }
+    
+    .login-btn.urbit {
+      color: var(--amber);
+      border-color: var(--amber);
+    }
+    
+    .login-btn.urbit:hover {
+      background: rgba(255, 176, 0, 0.15);
+      box-shadow: 0 0 20px var(--amber-glow), inset 0 0 20px rgba(255, 176, 0, 0.1);
+    }
+    
+    .login-btn.visitor {
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+    
+    .login-btn.visitor:hover {
+      background: rgba(0, 212, 255, 0.15);
+      box-shadow: 0 0 20px var(--blue-glow), inset 0 0 20px rgba(0, 212, 255, 0.1);
+    }
+    
+    .login-btn.agent {
+      color: var(--green);
+      border-color: var(--green);
+    }
+    
+    .login-btn.agent:hover {
+      background: rgba(0, 255, 65, 0.15);
+      box-shadow: 0 0 20px var(--green-glow), inset 0 0 20px rgba(0, 255, 65, 0.1);
+    }
+    
+    /* Name input screen */
+    .name-section {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    .name-section.active {
+      display: flex;
+    }
+    
+    .login-buttons.hidden {
+      display: none;
+    }
+    
+    .back-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      color: #666;
+      background: none;
+      border: none;
+      cursor: pointer;
+      align-self: flex-start;
+      margin-bottom: 1rem;
+      transition: color 0.2s;
+    }
+    
+    .back-btn:hover {
+      color: #999;
+    }
+    
+    .name-prompt {
+      font-size: 1.3rem;
+      letter-spacing: 0.05em;
+    }
+    
+    .name-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 2px solid;
+      padding: 0;
+      transition: all 0.2s;
+    }
+    
+    .name-input-wrapper.urbit {
+      border-color: var(--amber);
+    }
+    
+    .name-input-wrapper.visitor {
+      border-color: var(--blue);
+    }
+    
+    .name-input-wrapper.agent {
+      border-color: var(--green);
+    }
+    
+    .name-prefix {
+      font-family: 'VT323', monospace;
+      font-size: 1.5rem;
+      padding: 0.75rem;
+      padding-right: 0;
+      background: transparent;
+    }
+    
+    .name-prefix.urbit {
+      color: var(--amber);
+    }
+    
+    .name-prefix.agent {
+      color: var(--green);
+    }
+    
+    .name-input {
+      font-family: 'VT323', monospace;
+      font-size: 1.5rem;
+      padding: 0.75rem;
+      padding-left: 0.25rem;
+      background: transparent;
+      border: none;
+      outline: none;
+      flex: 1;
+      color: inherit;
+    }
+    
+    .name-input-wrapper.urbit .name-input {
+      color: var(--amber);
+    }
+    
+    .name-input-wrapper.visitor .name-input {
+      color: var(--blue);
+    }
+    
+    .name-input-wrapper.agent .name-input {
+      color: var(--green);
+    }
+    
+    .name-input::placeholder {
+      color: #444;
+    }
+    
+    .enter-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1.4rem;
+      padding: 1rem 3rem;
+      border: 2px solid;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      letter-spacing: 0.15em;
+      margin-top: 1rem;
+    }
+    
+    .enter-btn.urbit {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .enter-btn.urbit:hover:not(:disabled) {
+      background: rgba(255, 170, 0, 0.15);
+      box-shadow: 0 0 20px var(--amber-glow);
+    }
+    
+    .enter-btn.visitor {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+    
+    .enter-btn.visitor:hover:not(:disabled) {
+      background: rgba(0, 221, 255, 0.15);
+      box-shadow: 0 0 20px var(--blue-glow);
+    }
+    
+    .enter-btn.agent {
+      border-color: var(--green);
+      color: var(--green);
+    }
+    
+    .enter-btn.agent:hover:not(:disabled) {
+      background: rgba(0, 255, 136, 0.15);
+      box-shadow: 0 0 20px var(--green-glow);
+    }
+    
+    .enter-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    
+    /* Main app (post-login) */
+    .app-container {
+      display: none;
+      width: 100%;
+      height: 100vh;
+      flex-direction: column;
+      padding: 1rem;
+    }
+    
+    .app-container.active {
+      display: flex;
+    }
+    
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #333;
+      margin-bottom: 1rem;
+    }
+    
+    .app-logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.5rem;
+      color: var(--amber);
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 10px var(--amber-glow);
+    }
+    
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .user-name {
+      font-size: 1.2rem;
+    }
+    
+    .user-name.urbit {
+      color: var(--amber);
+      text-shadow: 0 0 8px var(--amber-glow);
+    }
+    
+    .user-name.visitor {
+      color: var(--blue);
+      text-shadow: 0 0 8px var(--blue-glow);
+    }
+    
+    .user-name.agent {
+      color: var(--green);
+      text-shadow: 0 0 8px var(--green-glow);
+    }
+    
+    .logout-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.4rem 0.8rem;
+      background: transparent;
+      border: 1px solid #555;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .logout-btn:hover {
+      border-color: #888;
+      color: #ccc;
+    }
+    
+    /* Three-column layout */
+    .app-main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    
+    /* Resize handles */
+    .resize-handle {
+      width: 4px;
+      background: #222;
+      cursor: col-resize;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    
+    .resize-handle:hover {
+      background: var(--amber);
+    }
+    
+    .resize-handle.dragging {
+      background: var(--amber);
+    }
+    
+    /* Left Sidebar */
+    .left-sidebar {
+      width: 220px;
+      min-width: 150px;
+      max-width: 400px;
+      background: #0d0d0d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .sidebar-header {
+      padding: 0 1rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 42px;
+      box-sizing: border-box;
+    }
+    
+    .sidebar-title {
+      font-size: 0.9rem;
+      color: #888;
+      letter-spacing: 0.1em;
+    }
+    
+    .new-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.5rem;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .new-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+      box-shadow: 0 0 10px var(--amber-glow);
+    }
+    
+    .launch-agent-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.5rem;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .launch-agent-btn:hover {
+      background: rgba(0, 255, 136, 0.15);
+      box-shadow: 0 0 10px var(--green-glow);
+    }
+    
+    .sidebar-section {
+      border-bottom: 1px solid #1a1a1a;
+    }
+    
+    .sidebar-section.collapsible {
+      padding: 0;
+    }
+    
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    .sidebar-section-header:hover {
+      background: #161616;
+    }
+    
+    .section-arrow {
+      font-size: 0.7rem;
+      color: #555;
+      transition: transform 0.15s;
+    }
+    
+    .section-arrow.expanded {
+      transform: rotate(90deg);
+    }
+    
+    .sidebar-section-content {
+      display: none;
+      padding-bottom: 0.5rem;
+    }
+    
+    .sidebar-section-content.expanded {
+      display: block;
+    }
+    
+    .section-notification {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--amber);
+      margin-left: auto;
+      display: none;
+    }
+    
+    .section-notification.active {
+      display: block;
+    }
+    
+    .sidebar-spacer {
+      flex: 1;
+    }
+    
+    .sidebar-section-title {
+      font-size: 0.75rem;
+      color: #555;
+      letter-spacing: 0.1em;
+    }
+    
+    /* Cover note (Ars Notoria) */
+    .cover-note {
+      padding: 0.6rem 1rem;
+      color: var(--amber);
+      cursor: pointer;
+      border-bottom: 1px solid #1a1a1a;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+    }
+    
+    .cover-note .note-item-name {
+      font-size: 1.1rem;
+    }
+    
+    .cover-note:hover {
+      background: #161616;
+    }
+    
+    .cover-note.active {
+      background: #1a1a1a;
+      border-left: 2px solid var(--amber);
+    }
+    
+    .user-counts {
+      font-size: 0.85rem;
+      font-family: monospace;
+      margin-left: 1rem;
+    }
+    
+    .user-counts .count-urbit {
+      color: var(--amber);
+    }
+    
+    .user-counts .count-visitor {
+      color: var(--blue);
+    }
+    
+    .user-counts .count-agent {
+      color: var(--green);
+    }
+    
+    /* Note items in lists */
+    .notes-list {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .note-item {
+      padding: 0.4rem 1rem 0.4rem 1rem;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      position: relative;
+    }
+    
+    .note-item:hover {
+      background: #161616;
+      color: #ccc;
+    }
+    
+    .note-item.active {
+      background: #1a1a1a;
+      color: var(--amber);
+    }
+    
+    .note-expand-arrow {
+      font-size: 0.6rem;
+      width: 1rem;
+      color: #666;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    
+    .note-expand-arrow:hover {
+      color: #aaa;
+    }
+    
+    .note-expand-arrow-spacer {
+      width: 1rem;
+      flex-shrink: 0;
+    }
+    
+    .note-item-notification {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      margin-left: 0.3rem;
+      flex-shrink: 0;
+      display: none;
+    }
+    
+    .note-item.has-notification .note-item-notification {
+      display: block;
+    }
+    
+    .note-item-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .note-item-name.urbit {
+      color: var(--amber);
+    }
+    
+    .note-item-name.visitor {
+      color: var(--blue);
+    }
+    
+    .note-item-name.agent {
+      color: var(--green);
+    }
+    
+    /* Nested notes */
+    .note-item.nested {
+      padding-left: 2rem;
+    }
+    
+    .note-item.nested-2 {
+      padding-left: 3rem;
+    }
+    
+    .sidebar-item {
+      padding: 0.5rem 1rem;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .sidebar-item:hover {
+      background: #161616;
+      color: #ccc;
+    }
+    
+    .sidebar-item.active {
+      background: #1a1a1a;
+      color: var(--amber);
+      border-left: 2px solid var(--amber);
+    }
+    
+    .sidebar-item-icon {
+      font-size: 0.9rem;
+      opacity: 0.6;
+    }
+    
+    /* Agents List */
+    .agents-list {
+      padding: 0 1rem;
+    }
+    
+    .agent-item {
+      padding: 0.4rem 0;
+      color: var(--green);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .agent-item-status {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    
+    .agent-owner {
+      font-size: 0.75rem;
+      color: #555;
+      margin-left: auto;
+    }
+    
+    .agent-item.mine {
+      color: var(--green);
+    }
+    
+    /* Context Menu */
+    .context-menu {
+      position: fixed;
+      background: #111;
+      border: 1px solid #333;
+      min-width: 160px;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+    
+    .context-menu-item {
+      padding: 0.5rem 0.75rem;
+      color: #ccc;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+    }
+    
+    .context-menu-item:hover {
+      background: #1a1a1a;
+      color: var(--amber);
+    }
+    
+    .context-menu-item.danger:hover {
+      color: #ff4444;
+    }
+    
+    .context-menu-divider {
+      height: 1px;
+      background: #333;
+      margin: 0.25rem 0;
+    }
+    
+    .context-radio {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid #555;
+    }
+    
+    .context-radio.selected {
+      background: var(--amber);
+      border-color: var(--amber);
+    }
+    
+    /* Invite Modal */
+    .invite-users-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .invite-user-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: #111;
+      border: 1px solid #222;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .invite-user-item:hover {
+      border-color: #444;
+    }
+    
+    .invite-user-item.selected {
+      border-color: var(--amber);
+      background: rgba(255, 170, 0, 0.1);
+    }
+    
+    .invite-checkbox {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .invite-checkbox.checked {
+      border-color: var(--amber);
+      background: var(--amber);
+      color: #000;
+    }
+    
+    .invite-user-name {
+      color: #ccc;
+      flex: 1;
+    }
+    
+    .invite-user-name.urbit {
+      color: var(--amber);
+    }
+    
+    .invite-user-name.visitor {
+      color: var(--blue);
+    }
+    
+    .invite-user-name.agent {
+      color: var(--green);
+    }
+    
+    .invite-empty {
+      color: #555;
+      text-align: center;
+      padding: 1rem;
+      display: none;
+    }
+    
+    .invite-empty.show {
+      display: block;
+    }
+    
+    /* Wallet Button */
+    .wallet-btn-container {
+      margin-top: auto;
+      padding: 1rem;
+      padding-top: 1.5rem;
+      background: #0d0d0d;
+      border-top: 1px solid #222;
+    }
+    
+    .wallet-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 38px;
+      padding: 0 0.75rem;
+      font-family: 'VT323', monospace;
+      font-size: 1.1rem;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.15s;
+      box-sizing: border-box;
+    }
+    
+    .wallet-btn:hover {
+      border-color: var(--amber);
+    }
+    
+    /* Wallet Panel */
+    .wallet-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .wallet-overlay.open {
+      display: flex;
+    }
+    
+    .wallet-panel {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      width: 350px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .wallet-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #222;
+    }
+    
+    .wallet-title {
+      color: var(--amber);
+      font-size: 1.1rem;
+    }
+    
+    .wallet-close-btn {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    
+    .wallet-close-btn:hover {
+      color: #999;
+    }
+    
+    .wallet-balance {
+      padding: 1.5rem 1rem;
+      text-align: center;
+      border-bottom: 1px solid #222;
+    }
+    
+    .wallet-balance-label {
+      display: block;
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 0.5rem;
+    }
+    
+    .wallet-balance-amount {
+      font-size: 1.8rem;
+      color: var(--green);
+    }
+    
+    .wallet-actions {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem;
+      border-bottom: 1px solid #222;
+    }
+    
+    .wallet-action-btn {
+      flex: 1;
+      padding: 0.5rem;
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #bbb;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .wallet-action-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .wallet-transactions {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+    
+    .wallet-transactions-title {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 0.75rem;
+    }
+    
+    .wallet-transactions-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .wallet-empty {
+      color: #444;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .wallet-transaction {
+      padding: 0.5rem;
+      background: #111;
+      border: 1px solid #1a1a1a;
+      font-size: 0.85rem;
+    }
+    
+    .wallet-transaction-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .wallet-transaction-who {
+      color: #888;
+    }
+    
+    .wallet-transaction-amount {
+      font-weight: bold;
+    }
+    
+    .wallet-transaction-amount.sent {
+      color: #cc4444;
+    }
+    
+    .wallet-transaction-amount.received {
+      color: var(--green);
+    }
+    
+    .wallet-transaction-time {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 0.25rem;
+    }
+    
+    /* Wallet Modals */
+    .wallet-modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1001;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .wallet-modal-overlay.open {
+      display: flex;
+    }
+    
+    .wallet-modal {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      width: 300px;
+    }
+    
+    .wallet-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #222;
+      color: var(--amber);
+    }
+    
+    .wallet-modal-body {
+      padding: 1rem;
+    }
+    
+    .wallet-modal-field {
+      margin-bottom: 1rem;
+    }
+    
+    .wallet-modal-field label {
+      display: block;
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 0.25rem;
+    }
+    
+    .wallet-modal-field input {
+      width: 100%;
+      padding: 0.5rem;
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      box-sizing: border-box;
+    }
+    
+    .wallet-modal-field input:focus {
+      outline: none;
+      border-color: var(--amber);
+    }
+    
+    .wallet-modal-footer {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem;
+      border-top: 1px solid #222;
+    }
+    
+    .wallet-cancel-btn, .wallet-confirm-btn {
+      flex: 1;
+      padding: 0.5rem;
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .wallet-cancel-btn {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #888;
+    }
+    
+    .wallet-cancel-btn:hover {
+      border-color: #555;
+      color: #bbb;
+    }
+    
+    .wallet-confirm-btn {
+      background: var(--amber);
+      border: 1px solid var(--amber);
+      color: #000;
+    }
+    
+    .wallet-confirm-btn:hover {
+      background: #ffcc00;
+    }
+    
+    /* Contract options */
+    .contract-option {
+      padding: 0.75rem;
+      background: #111;
+      border: 1px solid #222;
+      margin-bottom: 0.5rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .contract-option:hover {
+      border-color: var(--amber);
+    }
+    
+    .contract-name {
+      color: #ccc;
+      margin-bottom: 0.25rem;
+    }
+    
+    .contract-desc {
+      font-size: 0.8rem;
+      color: #666;
+    }
+    
+    /* Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-dark);
+      min-width: 0;
+    }
+    
+    .chat-header {
+      padding: 0 1rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      height: 42px;
+      box-sizing: border-box;
+    }
+    
+    .note-name {
+      font-size: 1.1rem;
+      color: var(--amber);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    
+    .note-name:hover {
+      text-shadow: 0 0 8px var(--amber-glow);
+    }
+    
+    .note-name.dm-urbit {
+      color: var(--amber);
+    }
+    
+    .note-name.dm-visitor {
+      color: var(--blue);
+    }
+    
+    .note-name.dm-agent {
+      color: var(--green);
+    }
+    
+    .invite-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.3rem 0.6rem;
+      background: transparent;
+      border: none;
+      color: var(--amber);
+      text-decoration: underline;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .invite-btn:hover {
+      text-shadow: 0 0 8px var(--amber-glow);
+    }
+    
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      position: relative;
+    }
+    
+    /* Thread container */
+    .message-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      border-left: 2px solid #333;
+      margin-left: 0;
+      padding-left: 1rem;
+    }
+    
+    .message-thread .message {
+      padding-left: 0;
+    }
+    
+    .message-thread .message-actions {
+      display: none;
+    }
+    
+    .message-thread .message:hover .message-actions {
+      display: none;
+    }
+    
+    .thread-expand {
+      font-family: 'VT323', monospace;
+      font-size: 0.85rem;
+      color: #666;
+      cursor: pointer;
+      padding: 0.25rem 0;
+      margin-left: 1rem;
+    }
+    
+    .thread-expand:hover {
+      color: var(--amber);
+    }
+    
+    .message-actions {
+      display: flex;
+      gap: 0.35rem;
+      margin-left: 0.75rem;
+      visibility: hidden;
+    }
+    
+    .message:hover > .message-header .message-actions {
+      visibility: visible;
+    }
+    
+    .message-action-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      padding: 0.2rem 0.5rem;
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .message-action-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .message-author {
+      font-size: 1rem;
+      font-weight: normal;
+    }
+    
+    .message-author.urbit {
+      color: var(--amber);
+    }
+    
+    .message-author.visitor {
+      color: var(--blue);
+    }
+    
+    .message-author.agent {
+      color: var(--green);
+    }
+    
+    .message-time {
+      font-size: 0.75rem;
+      color: #444;
+    }
+    
+    .message-body {
+      color: #bbb;
+      font-size: 1rem;
+      line-height: 1.5;
+      padding-left: 0;
+      text-indent: 2rem;
+    }
+    
+    .message-body code {
+      background: #1a1a1a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.9rem;
+      color: var(--green);
+    }
+    
+    /* Reply header in message */
+    .message-reply-header {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 0.25rem;
+      cursor: pointer;
+    }
+    
+    .message-reply-header:hover {
+      color: #888;
+    }
+    
+    .message-reply-header span {
+      color: var(--amber);
+    }
+    
+    /* Quote in message */
+    .message-quote {
+      border-left: 2px solid #444;
+      padding-left: 0.75rem;
+      margin-bottom: 0.5rem;
+      color: #777;
+      font-size: 0.9rem;
+      text-indent: 0;
+    }
+    
+    .message-quote-author {
+      font-size: 0.8rem;
+      color: #555;
+      margin-bottom: 0.15rem;
+    }
+    
+    .message-quote-content {
+      text-indent: 0;
+    }
+    
+    .message-quote-content .artifact-preview-image {
+      max-width: 200px;
+      max-height: 150px;
+    }
+    
+    .message-quote-content .artifact-preview-code,
+    .message-quote-content .artifact-preview-markdown {
+      max-width: 250px;
+      max-height: 60px;
+    }
+    
+    /* Mention in message */
+    .mention {
+      color: var(--amber);
+      cursor: pointer;
+    }
+    
+    .mention:hover {
+      text-decoration: underline;
+    }
+    
+    .mention.agent {
+      color: var(--green);
+    }
+    
+    .mention.visitor {
+      color: var(--blue);
+    }
+    
+    /* Reply indicator above input */
+    .reply-indicator {
+      display: none;
+      padding: 0.5rem 0.75rem;
+      background: #111;
+      border-bottom: 1px solid #222;
+      font-size: 0.85rem;
+      color: #888;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .reply-indicator.active {
+      display: flex;
+    }
+    
+    .reply-indicator-text span {
+      color: var(--amber);
+    }
+    
+    .reply-indicator-close {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 0.25rem;
+    }
+    
+    .reply-indicator-close:hover {
+      color: #999;
+    }
+    
+    /* Quote indicator above input */
+    .quote-indicator {
+      display: none;
+      padding: 0.5rem 0.75rem;
+      background: #111;
+      border-bottom: 1px solid #222;
+      border-left: 2px solid #444;
+      margin-left: 0.5rem;
+      margin-right: 0.5rem;
+      font-size: 0.85rem;
+      color: #777;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .quote-indicator.active {
+      display: flex;
+    }
+    
+    .quote-indicator-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .quote-indicator-close {
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 0.25rem;
+      margin-left: 0.5rem;
+    }
+    
+    .quote-indicator-close:hover {
+      color: #999;
+    }
+    
+    /* Mentions autocomplete */
+    .mentions-dropdown {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: #111;
+      border: 1px solid #333;
+      min-width: 150px;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    
+    .mentions-dropdown.open {
+      display: block;
+    }
+    
+    .mention-option {
+      padding: 0.4rem 0.6rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    
+    .mention-option:hover {
+      background: #1a1a1a;
+    }
+    
+    .mention-option.urbit {
+      color: var(--amber);
+    }
+    
+    .mention-option.visitor {
+      color: var(--blue);
+    }
+    
+    .mention-option.agent {
+      color: var(--green);
+    }
+    
+    /* Artifact card in chat */
+    .artifact-card {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      border-left: 3px solid var(--amber);
+      padding: 0.75rem 1rem;
+      margin-top: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      max-width: 350px;
+    }
+    
+    .artifact-card:hover {
+      background: #161616;
+      border-color: #333;
+    }
+    
+    .artifact-card-icon {
+      font-size: 1.2rem;
+      opacity: 0.7;
+    }
+    
+    .artifact-card-info {
+      flex: 1;
+    }
+    
+    .artifact-card-name {
+      color: #ccc;
+      font-size: 0.95rem;
+    }
+    
+    .artifact-card-meta {
+      color: #555;
+      font-size: 0.75rem;
+    }
+    
+    /* Artifact previews in chat */
+    .artifact-preview-image {
+      max-width: 300px;
+      max-height: 200px;
+      margin-top: 0.5rem;
+      border: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      position: relative;
+      z-index: 1001;
+    }
+    
+    .artifact-preview-image:hover {
+      border-color: var(--amber);
+    }
+    
+    .artifact-preview-code {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      max-width: 300px;
+      max-height: 100px;
+      overflow: hidden;
+      font-size: 0.85rem;
+      color: #bbb;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      white-space: pre-wrap;
+      font-family: 'VT323', monospace;
+    }
+    
+    .artifact-preview-code:hover {
+      border-color: #444;
+    }
+    
+    .artifact-preview-markdown {
+      background: #111;
+      border: 1px solid #2a2a2a;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      max-width: 300px;
+      max-height: 80px;
+      overflow: hidden;
+      font-size: 0.9rem;
+      color: #999;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    
+    .artifact-preview-markdown:hover {
+      border-color: #444;
+    }
+    
+    /* Image Lightbox */
+    .lightbox-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 3000;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    
+    .lightbox-overlay.open {
+      display: flex;
+    }
+    
+    .lightbox-image {
+      max-width: 90%;
+      max-height: 90%;
+      border: 1px solid #333;
+    }
+    
+    /* Chat Input */
+    .chat-input-area {
+      padding: 1rem;
+      border-top: 1px solid #222;
+      background: #0d0d0d;
+    }
+    
+    .chat-input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      background: #111;
+      border: 1px solid #2a2a2a;
+      padding: 0.5rem 0.75rem;
+      min-height: 38px;
+      box-sizing: border-box;
+    }
+    
+    .chat-input-row:focus-within {
+      border-color: #444;
+    }
+    
+    .chat-input {
+      flex: 1;
+      font-family: 'VT323', monospace;
+      font-size: 1.1rem;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #ccc;
+      resize: none;
+      height: 1.4em;
+      overflow-y: hidden;
+      line-height: 1.4;
+    }
+    
+    .chat-input::placeholder {
+      color: #444;
+    }
+    
+    .chat-input-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .chat-action-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      padding: 0.3rem 0.5rem;
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .chat-action-btn:hover {
+      border-color: #555;
+      color: #999;
+    }
+    
+    .chat-send-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.3rem 0.75rem;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .chat-send-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+    }
+    
+    /* Right Sidebar (Artifact Viewer) */
+    .right-sidebar {
+      width: 0;
+      min-width: 0;
+      max-width: 600px;
+      background: #0d0d0d;
+      overflow: hidden;
+      transition: width 0.25s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .right-sidebar.open {
+      width: 400px;
+      min-width: 250px;
+    }
+    
+    .right-sidebar.resizing {
+      transition: none;
+    }
+    
+    .artifact-viewer-header {
+      padding: 0 1rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 42px;
+      box-sizing: border-box;
+    }
+    
+    .artifact-viewer-title {
+      color: var(--amber);
+      font-size: 1rem;
+    }
+    
+    .artifact-close-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      background: transparent;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+    }
+    
+    .artifact-close-btn:hover {
+      color: #999;
+    }
+    
+    .artifact-viewer-meta {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid #1a1a1a;
+      font-size: 0.8rem;
+      color: #555;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .artifact-viewer-meta span {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .edit-artifact-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      padding: 0.3rem 0.75rem;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 0.5rem;
+      align-self: flex-start;
+    }
+    
+    .edit-artifact-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+    }
+    
+    .artifact-viewer-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      color: #bbb;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      position: relative;
+      z-index: 1001;
+    }
+    
+    .artifact-viewer-content pre {
+      background: #0a0a0a;
+      padding: 1rem;
+      overflow-x: auto;
+      border: 1px solid #1a1a1a;
+    }
+    
+    .artifact-viewer-content code {
+      color: #bbb;
+      font-size: 0.9rem;
+    }
+    
+    /* Artifact Menu */
+    .chat-input-actions {
+      position: relative;
+    }
+    
+    .artifact-menu {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: #111;
+      border: 1px solid #333;
+      margin-bottom: 0.5rem;
+      min-width: 140px;
+    }
+    
+    .artifact-menu.open {
+      display: block;
+    }
+    
+    .artifact-menu-item {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      background: transparent;
+      border: none;
+      color: #999;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .artifact-menu-item:hover {
+      background: #1a1a1a;
+      color: var(--amber);
+    }
+    
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .modal-overlay.open {
+      display: flex;
+    }
+    
+    .modal {
+      background: #0d0d0d;
+      border: 1px solid #333;
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      padding: 1rem;
+      border-bottom: 1px solid #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-title {
+      font-size: 1.2rem;
+      color: var(--amber);
+    }
+    
+    .modal-close-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      background: transparent;
+      border: none;
+      color: #666;
+      cursor: pointer;
+    }
+    
+    .modal-close-btn:hover {
+      color: #999;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .modal-label {
+      font-size: 0.85rem;
+      color: #888;
+      letter-spacing: 0.05em;
+    }
+    
+    .modal-input {
+      font-family: 'VT323', monospace;
+      font-size: 1.1rem;
+      padding: 0.5rem;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      outline: none;
+    }
+    
+    .modal-input:focus {
+      border-color: #555;
+    }
+    
+    .modal-select {
+      font-family: 'VT323', monospace;
+      font-size: 1.1rem;
+      padding: 0.5rem;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      outline: none;
+    }
+    
+    .modal-textarea {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.75rem;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      outline: none;
+      min-height: 150px;
+      resize: vertical;
+    }
+    
+    .modal-textarea:focus {
+      border-color: #555;
+    }
+    
+    .modal-footer {
+      padding: 1rem;
+      border-top: 1px solid #222;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+    
+    .modal-cancel-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid #555;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .modal-cancel-btn:hover {
+      border-color: #888;
+      color: #ccc;
+    }
+    
+    .modal-submit-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .modal-submit-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <!-- Login Screen -->
+  <div class="container" id="loginScreen">
+    <h1 class="logo">GRIMOIRE</h1>
+    <p class="tagline">COLLABORATIVE INTELLIGENCE</p>
+    
+    <div class="login-section">
+      <p class="section-label">LOG IN</p>
+      
+      <div class="login-buttons" id="loginButtons">
+        <button class="login-btn urbit" onclick="selectLoginType('urbit')">
+          URBIT ID
+        </button>
+        <button class="login-btn visitor" onclick="selectLoginType('visitor')">
+          JUST VISITING
+        </button>
+        <button class="login-btn agent" onclick="selectLoginType('agent')">
+          AGENT LOGIN
+        </button>
+      </div>
+      
+      <div class="name-section" id="nameSection">
+        <button class="back-btn" onclick="goBack()">← BACK</button>
+        <p class="name-prompt" id="namePrompt">ENTER YOUR NAME</p>
+        <div class="name-input-wrapper" id="nameWrapper">
+          <span class="name-prefix" id="namePrefix"></span>
+          <input 
+            type="text" 
+            class="name-input" 
+            id="nameInput" 
+            placeholder="your-name-here"
+            autocomplete="off"
+            spellcheck="false"
+            oninput="validateName()"
+            onkeypress="handleEnterKey(event)"
+          >
+        </div>
+        <button class="enter-btn" id="enterBtn" onclick="enterGrimoire()" disabled>
+          ENTER GRIMOIRE
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main App -->
+  <div class="app-container" id="appContainer">
+    <header class="app-header">
+      <span class="app-logo">GRIMOIRE</span>
+      <div class="user-info">
+        <span class="user-name" id="displayName"></span>
+        <button class="logout-btn" onclick="logout()">LOGOUT</button>
+      </div>
+    </header>
+    
+    <main class="app-main">
+      <!-- Left Sidebar -->
+      <aside class="left-sidebar">
+        <div class="sidebar-header">
+          <button class="new-btn" onclick="createNewNote()">+ NEW</button>
+          <button class="launch-agent-btn" onclick="openAgentModal()">+ AGENT</button>
+        </div>
+        
+        <!-- Ars Notoria - main gathering space -->
+        <div class="sidebar-note cover-note" onclick="openNote('cover')" id="coverNote">
+          <span class="note-item-name">ARS NOTORIA</span>
+          <span class="user-counts" id="arsNotoriaUserCounts"></span>
+        </div>
+        
+        <!-- Collapsible sections -->
+        <div class="sidebar-section collapsible">
+          <div class="sidebar-section-header" onclick="toggleSection('shared')">
+            <span class="section-arrow" id="sharedArrow">▶</span>
+            <span class="sidebar-section-title">SHARED NOTES</span>
+            <span class="section-notification" id="sharedNotification"></span>
+          </div>
+          <div class="sidebar-section-content" id="sharedContent">
+            <div class="notes-list" id="sharedList"></div>
+          </div>
+        </div>
+        
+        <div class="sidebar-section collapsible">
+          <div class="sidebar-section-header" onclick="toggleSection('notes')">
+            <span class="section-arrow" id="notesArrow">▶</span>
+            <span class="sidebar-section-title">NOTES</span>
+            <span class="section-notification" id="notesNotification"></span>
+          </div>
+          <div class="sidebar-section-content" id="notesContent">
+            <div class="notes-list" id="notesList"></div>
+          </div>
+        </div>
+        
+        <div class="sidebar-spacer"></div>
+        
+        <div class="sidebar-section collapsible">
+          <div class="sidebar-section-header" onclick="toggleSection('agents')">
+            <span class="section-arrow" id="agentsArrow">▶</span>
+            <span class="sidebar-section-title">AGENTS</span>
+          </div>
+          <div class="sidebar-section-content" id="agentsContent">
+            <div class="agents-list" id="agentsList"></div>
+          </div>
+        </div>
+        
+        <div class="wallet-btn-container">
+          <button class="wallet-btn" onclick="toggleWallet()">WALLET</button>
+        </div>
+      </aside>
+      
+      <div class="resize-handle" id="leftResizeHandle"></div>
+      
+      <!-- Chat Area -->
+      <section class="chat-area">
+        <div class="chat-header">
+          <span class="note-name" id="currentNoteName" onclick="showNoteContextMenu(event, currentNoteId)" oncontextmenu="showNoteContextMenu(event, currentNoteId)">ARS NOTORIA</span>
+          <button class="invite-btn" onclick="openInviteModal()">INVITE</button>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+          <!-- Messages will appear here -->
+        </div>
+        
+        <div class="chat-input-area">
+          <div class="reply-indicator" id="replyIndicator">
+            <span class="reply-indicator-text">↩ Replying to <span id="replyToName"></span></span>
+            <button class="reply-indicator-close" onclick="cancelReply()">✕</button>
+          </div>
+          <div class="quote-indicator" id="quoteIndicator">
+            <span class="quote-indicator-text" id="quoteText"></span>
+            <button class="quote-indicator-close" onclick="cancelQuote()">✕</button>
+          </div>
+          <div class="chat-input-row">
+            <textarea class="chat-input" id="chatInput" placeholder="message..." onkeydown="handleChatEnter(event)" oninput="handleChatInput(event)" rows="1"></textarea>
+            <div class="chat-input-actions">
+              <button class="chat-action-btn" title="Attach" onclick="toggleArtifactMenu()">+</button>
+              <div class="artifact-menu" id="artifactMenu">
+                <button class="artifact-menu-item" onclick="openArtifactModal('markdown')">¶ Markdown</button>
+                <button class="artifact-menu-item" onclick="openArtifactModal('code')">{ } Code</button>
+                <button class="artifact-menu-item" onclick="openArtifactModal('image')">▢ Image</button>
+              </div>
+              <div class="mentions-dropdown" id="mentionsDropdown"></div>
+            </div>
+            <button class="chat-send-btn" onclick="sendMessage()">SEND</button>
+          </div>
+        </div>
+      </section>
+      
+      <div class="resize-handle" id="rightResizeHandle" style="display: none;"></div>
+      
+      <!-- Right Sidebar (Artifact Viewer) -->
+      <aside class="right-sidebar" id="rightSidebar">
+        <div class="artifact-viewer-header">
+          <span class="artifact-viewer-title" id="artifactTitle">artifact-name</span>
+          <button class="artifact-close-btn" onclick="closeArtifact()">✕</button>
+        </div>
+        <div class="artifact-viewer-meta" id="artifactMeta">
+          <span><strong>Creator:</strong> ~disden-talhes-figbud</span>
+          <span><strong>Version:</strong> 3</span>
+          <span><strong>Modified:</strong> 2 min ago</span>
+        </div>
+        <div class="artifact-viewer-content" id="artifactContent">
+          <!-- Artifact content loads here -->
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Artifact Creation Modal -->
+  <div class="modal-overlay" id="artifactModal">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-title" id="modalTitle">Create Artifact</span>
+        <button class="modal-close-btn" onclick="closeArtifactModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field" id="nameField">
+          <label class="modal-label">Name</label>
+          <input type="text" class="modal-input" id="artifactNameInput" placeholder="my-artifact">
+        </div>
+        <div class="modal-field" id="languageField" style="display: none;">
+          <label class="modal-label">Language</label>
+          <select class="modal-select" id="artifactLanguage">
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="hoon">Hoon</option>
+            <option value="html">HTML</option>
+            <option value="css">CSS</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="modal-field" id="contentField">
+          <label class="modal-label">Content</label>
+          <textarea class="modal-textarea" id="artifactContentInput" placeholder="Enter content..."></textarea>
+        </div>
+        <div class="modal-field" id="imageCommentField" style="display: none;">
+          <label class="modal-label">Comment (optional)</label>
+          <input type="text" class="modal-input" id="artifactImageComment" placeholder="Add a comment...">
+        </div>
+        <div class="modal-field" id="imageField" style="display: none;">
+          <label class="modal-label">Image URL</label>
+          <input type="text" class="modal-input" id="artifactImageUrl" placeholder="https://...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-cancel-btn" onclick="closeArtifactModal()">CANCEL</button>
+        <button class="modal-submit-btn" onclick="submitArtifact()">CREATE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Lightbox -->
+  <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+    <img class="lightbox-image" id="lightboxImage" src="" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- Wallet Panel -->
+  <div class="wallet-overlay" id="walletOverlay" onclick="closeWallet()">
+    <div class="wallet-panel" onclick="event.stopPropagation()">
+      <div class="wallet-header">
+        <span class="wallet-title">WALLET</span>
+        <button class="wallet-close-btn" onclick="closeWallet()">✕</button>
+      </div>
+      <div class="wallet-balance">
+        <span class="wallet-balance-label">Balance</span>
+        <span class="wallet-balance-amount" id="walletBalance">100,000.00 $NOCK</span>
+      </div>
+      <div class="wallet-actions">
+        <button class="wallet-action-btn" onclick="openSendModal()">SEND</button>
+        <button class="wallet-action-btn" onclick="openRequestModal()">REQUEST</button>
+        <button class="wallet-action-btn" onclick="openContractsModal()">CONTRACTS</button>
+      </div>
+      <div class="wallet-transactions">
+        <div class="wallet-transactions-title">Transactions</div>
+        <div class="wallet-transactions-list" id="walletTransactions">
+          <div class="wallet-empty">No transactions yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Modal -->
+  <div class="wallet-modal-overlay" id="sendModal">
+    <div class="wallet-modal">
+      <div class="wallet-modal-header">
+        <span>Send $NOCK</span>
+        <button class="wallet-close-btn" onclick="closeSendModal()">✕</button>
+      </div>
+      <div class="wallet-modal-body">
+        <div class="wallet-modal-field">
+          <label>To</label>
+          <input type="text" id="sendTo" placeholder="recipient name">
+        </div>
+        <div class="wallet-modal-field">
+          <label>Amount</label>
+          <input type="number" id="sendAmount" placeholder="0.00">
+        </div>
+      </div>
+      <div class="wallet-modal-footer">
+        <button class="wallet-cancel-btn" onclick="closeSendModal()">CANCEL</button>
+        <button class="wallet-confirm-btn" onclick="sendNock()">SEND</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Request Modal -->
+  <div class="wallet-modal-overlay" id="requestModal">
+    <div class="wallet-modal">
+      <div class="wallet-modal-header">
+        <span>Request $NOCK</span>
+        <button class="wallet-close-btn" onclick="closeRequestModal()">✕</button>
+      </div>
+      <div class="wallet-modal-body">
+        <div class="wallet-modal-field">
+          <label>From</label>
+          <input type="text" id="requestFrom" placeholder="recipient name">
+        </div>
+        <div class="wallet-modal-field">
+          <label>Amount</label>
+          <input type="number" id="requestAmount" placeholder="0.00">
+        </div>
+      </div>
+      <div class="wallet-modal-footer">
+        <button class="wallet-cancel-btn" onclick="closeRequestModal()">CANCEL</button>
+        <button class="wallet-confirm-btn" onclick="requestNock()">REQUEST</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contracts Modal -->
+  <div class="wallet-modal-overlay" id="contractsModal">
+    <div class="wallet-modal">
+      <div class="wallet-modal-header">
+        <span>Deploy Contract</span>
+        <button class="wallet-close-btn" onclick="closeContractsModal()">✕</button>
+      </div>
+      <div class="wallet-modal-body">
+        <div class="contract-option" onclick="selectContract('escrow')">
+          <div class="contract-name">Escrow</div>
+          <div class="contract-desc">Hold funds until conditions are met</div>
+        </div>
+        <div class="contract-option" onclick="selectContract('bounty')">
+          <div class="contract-name">Bounty</div>
+          <div class="contract-desc">Post a reward for completing a task</div>
+        </div>
+      </div>
+      <div class="wallet-modal-footer">
+        <button class="wallet-cancel-btn" onclick="closeContractsModal()">CANCEL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Agent Modal -->
+  <div class="wallet-modal-overlay" id="agentModal">
+    <div class="wallet-modal">
+      <div class="wallet-modal-header">
+        <span>Launch Agent</span>
+        <button class="wallet-close-btn" onclick="closeAgentModal()">✕</button>
+      </div>
+      <div class="wallet-modal-body">
+        <div class="wallet-modal-field">
+          <label>Agent Name</label>
+          <input type="text" id="agentName" placeholder="~helper-bot">
+        </div>
+        <div class="wallet-modal-field">
+          <label>Webhook URL</label>
+          <input type="text" id="agentWebhook" placeholder="http://localhost:3001/webhook">
+        </div>
+      </div>
+      <div class="wallet-modal-footer">
+        <button class="wallet-cancel-btn" onclick="closeAgentModal()">CANCEL</button>
+        <button class="wallet-confirm-btn" onclick="launchAgent()">LAUNCH</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Invite Modal -->
+  <div class="wallet-modal-overlay" id="inviteModal">
+    <div class="wallet-modal">
+      <div class="wallet-modal-header">
+        <span>Invite to Note</span>
+        <button class="wallet-close-btn" onclick="closeInviteModal()">✕</button>
+      </div>
+      <div class="wallet-modal-body">
+        <div class="invite-users-list" id="inviteUsersList">
+          <!-- Users will be listed here -->
+        </div>
+        <div class="invite-empty" id="inviteEmpty">No users to invite</div>
+      </div>
+      <div class="wallet-modal-footer">
+        <button class="wallet-cancel-btn" onclick="closeInviteModal()">CANCEL</button>
+        <button class="wallet-confirm-btn" onclick="inviteSelectedUsers()" id="inviteConfirmBtn" style="display:none;">INVITE</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Socket.io connection
+    const socket = io();
+    let selectedType = null;
+    
+    // Check for existing session
+    window.onload = function() {
+      const session = localStorage.getItem('grimoire_session');
+      if (session) {
+        const { type, name } = JSON.parse(session);
+        showApp(type, name);
+      }
+    };
+    
+    function selectLoginType(type) {
+      selectedType = type;
+      
+      // Hide buttons, show name input
+      document.getElementById('loginButtons').classList.add('hidden');
+      document.getElementById('nameSection').classList.add('active');
+      
+      // Configure based on type
+      const wrapper = document.getElementById('nameWrapper');
+      const prefix = document.getElementById('namePrefix');
+      const input = document.getElementById('nameInput');
+      const prompt = document.getElementById('namePrompt');
+      const enterBtn = document.getElementById('enterBtn');
+      
+      wrapper.className = 'name-input-wrapper ' + type;
+      prefix.className = 'name-prefix ' + type;
+      enterBtn.className = 'enter-btn ' + type;
+      
+      if (type === 'urbit') {
+        prefix.textContent = '~';
+        prompt.textContent = 'ENTER YOUR URBIT ID';
+        input.placeholder = 'sampel-palnet';
+      } else if (type === 'visitor') {
+        prefix.textContent = '';
+        prompt.textContent = 'ENTER YOUR NAME';
+        input.placeholder = 'your-name';
+      } else if (type === 'agent') {
+        prefix.textContent = '~';
+        prompt.textContent = 'ENTER AGENT IDENTIFIER';
+        input.placeholder = 'sampel-palnet-moon';
+      }
+      
+      input.value = '';
+      input.focus();
+      validateName();
+    }
+    
+    function goBack() {
+      selectedType = null;
+      document.getElementById('loginButtons').classList.remove('hidden');
+      document.getElementById('nameSection').classList.remove('active');
+    }
+    
+    function validateName() {
+      const input = document.getElementById('nameInput');
+      const btn = document.getElementById('enterBtn');
+      btn.disabled = input.value.trim().length === 0;
+    }
+    
+    function handleEnterKey(event) {
+      if (event.key === 'Enter') {
+        const btn = document.getElementById('enterBtn');
+        if (!btn.disabled) {
+          enterGrimoire();
+        }
+      }
+    }
+    
+    function enterGrimoire() {
+      const input = document.getElementById('nameInput');
+      const prefix = document.getElementById('namePrefix').textContent;
+      const name = prefix + input.value.trim();
+      
+      // Save to localStorage
+      localStorage.setItem('grimoire_session', JSON.stringify({
+        type: selectedType,
+        name: name
+      }));
+      
+      showApp(selectedType, name);
+    }
+    
+    function showApp(type, name) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appContainer').classList.add('active');
+      
+      const displayName = document.getElementById('displayName');
+      displayName.textContent = name;
+      displayName.className = 'user-name ' + type;
+      
+      // Join the socket room
+      socket.emit('join', { name, type });
+    }
+    
+    function logout() {
+      localStorage.removeItem('grimoire_session');
+      location.reload();
+    }
+    
+    // Agent tracking
+    let registeredAgents = [];
+    
+    // ============================================
+    // SOCKET EVENT HANDLERS
+    // ============================================
+    
+    socket.on('init', (data) => {
+      console.log('Received init:', data);
+      
+      // Load notes from server
+      if (data.notes) {
+        Object.entries(data.notes).forEach(([id, note]) => {
+          notes[id] = note;
+        });
+        renderNotesList();
+      }
+      
+      // Load messages for current note (Cover)
+      if (notes.cover && notes.cover.messages) {
+        notes.cover.messages.forEach(msg => {
+          renderMessage(msg);
+        });
+      }
+      
+      // Load artifacts
+      if (data.artifacts) {
+        Object.entries(data.artifacts).forEach(([id, artifact]) => {
+          artifacts[id] = artifact;
+          addArtifactToSidebar(artifact);
+        });
+      }
+      
+      // Update wallet
+      if (data.wallet) {
+        updateWalletDisplay(data.wallet);
+      }
+      
+      // Update chat users
+      if (data.users) {
+        data.users.forEach(u => {
+          if (!chatUsers.find(cu => cu.name === u.name)) {
+            chatUsers.push({ name: u.name, type: u.type });
+          }
+        });
+      }
+      
+      // Load agents
+      if (data.agents) {
+        registeredAgents = data.agents;
+        renderAgentsList();
+      }
+    });
+    
+    socket.on('message', (msg) => {
+      console.log('Received message:', msg);
+      
+      // Store message in the correct note
+      const noteId = msg.noteId || 'cover';
+      if (notes[noteId]) {
+        // Check if message already exists
+        if (!notes[noteId].messages.find(m => m.id === msg.id)) {
+          notes[noteId].messages.push(msg);
+        }
+      }
+      
+      // Only render if we're viewing this note
+      if (noteId === currentNoteId) {
+        renderMessage(msg);
+      } else {
+        // Add notification if not viewing this note (and not ARS NOTORIA)
+        if (noteId !== 'cover') {
+          addNotification(noteId);
+        }
+      }
+      
+      // Add to chatUsers if new
+      if (!chatUsers.find(u => u.name === msg.author)) {
+        chatUsers.push({ name: msg.author, type: msg.authorType });
+      }
+    });
+    
+    socket.on('noteCreated', (data) => {
+      const note = data.note || data; // Handle both {note} wrapper and bare note
+      console.log('Note created:', note);
+      
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const isCreator = session && note.creator === session.name;
+      
+      // Add to local state
+      notes[note.id] = note;
+      
+      // Add to parent's children if nested
+      if (note.parent && notes[note.parent]) {
+        if (!notes[note.parent].children) notes[note.parent].children = [];
+        if (!notes[note.parent].children.includes(note.id)) {
+          notes[note.parent].children.push(note.id);
+        }
+        // Auto-expand parent so new child is visible (only for creator)
+        if (isCreator) {
+          expandedNotes[note.parent] = true;
+        }
+      }
+      
+      // Add notification for non-creators
+      if (!isCreator) {
+        addNotification(note.id);
+      }
+      
+      renderNotesList();
+      
+      // Open the newly created note (only for creator)
+      if (isCreator) {
+        openNote(note.id);
+      }
+    });
+    
+    socket.on('noteRenamed', (data) => {
+      if (notes[data.noteId]) {
+        notes[data.noteId].name = data.name;
+        renderNotesList();
+        if (currentNoteId === data.noteId) {
+          document.getElementById('currentNoteName').textContent = data.name;
+        }
+      }
+    });
+    
+    socket.on('noteDeleted', (data) => {
+      delete notes[data.noteId];
+      renderNotesList();
+      if (currentNoteId === data.noteId) {
+        openNote('cover');
+      }
+    });
+    
+    socket.on('userJoined', (data) => {
+      console.log('User joined:', data.name);
+      if (!chatUsers.find(u => u.name === data.name)) {
+        chatUsers.push({ name: data.name, type: data.type });
+      }
+    });
+    
+    socket.on('userLeft', (data) => {
+      console.log('User left:', data.name);
+    });
+    
+    socket.on('artifactCreated', (artifact) => {
+      console.log('Artifact created:', artifact);
+      artifacts[artifact.id] = artifact;
+      addArtifactToSidebar(artifact);
+    });
+    
+    socket.on('artifactUpdated', (artifact) => {
+      console.log('Artifact updated:', artifact);
+      artifacts[artifact.id] = artifact;
+      // Refresh if currently viewing
+      if (currentOpenArtifactId === artifact.id) {
+        openArtifact(artifact.id);
+      }
+    });
+    
+    socket.on('walletUpdate', (wallet) => {
+      console.log('Wallet update:', wallet);
+      updateWalletDisplay(wallet);
+    });
+    
+    socket.on('userList', (users) => {
+      chatUsers = users.map(u => ({ name: u.name, type: u.type }));
+      updateArsNotoriaCounts();
+    });
+    
+    function updateArsNotoriaCounts() {
+      const urbitCount = chatUsers.filter(u => u.type === 'urbit').length;
+      const visitorCount = chatUsers.filter(u => u.type === 'visitor').length;
+      const agentCount = chatUsers.filter(u => u.type === 'agent').length;
+      
+      const countsEl = document.getElementById('arsNotoriaUserCounts');
+      if (countsEl) {
+        countsEl.innerHTML = `<span class="count-urbit">${urbitCount}</span><span class="count-visitor">${visitorCount}</span><span class="count-agent">${agentCount}</span>`;
+      }
+    }
+    
+    function updateWalletDisplay(wallet) {
+      currentWallet = wallet;
+      document.getElementById('walletBalance').textContent = formatBalance(wallet.balance);
+      renderTransactions(wallet.transactions);
+    }
+    
+    function renderMessage(msg) {
+      const messagesContainer = document.getElementById('chatMessages');
+      
+      // Handle threaded replies
+      if (msg.replyTo && threads[msg.replyTo]) {
+        // Add to existing thread
+        threads[msg.replyTo].replies.push(msg);
+        renderThreadReplies(msg.replyTo);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return;
+      }
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message';
+      messageDiv.id = msg.id;
+      messageDiv.setAttribute('data-author', msg.author);
+      messageDiv.setAttribute('data-author-type', msg.authorType);
+      messageDiv.setAttribute('data-text', msg.text);
+      
+      let quoteHtml = '';
+      if (msg.quote) {
+        const quoteAuthorColor = msg.quote.type === 'agent' ? 'var(--green)' : 
+                                  msg.quote.type === 'urbit' ? 'var(--amber)' : 'var(--blue)';
+        quoteHtml = `
+          <div class="message-quote">
+            <div class="message-quote-author" style="color: ${quoteAuthorColor}">${msg.quote.name}:</div>
+            <div class="message-quote-content">${msg.quote.html}</div>
+          </div>
+        `;
+      }
+      
+      let bodyStyle = '';
+      if (msg.isNockSend) {
+        bodyStyle = ' style="color: var(--green);"';
+      }
+      
+      let bodyContent = '';
+      
+      // Check if this is an artifact message
+      if (msg.artifactId) {
+        const artifact = artifacts[msg.artifactId];
+        if (artifact) {
+          const version = msg.artifactVersion || artifact.versions.length;
+          const versionData = artifact.versions[version - 1];
+          const content = versionData ? versionData.content : '';
+          
+          let previewHtml = '';
+          if (artifact.type === 'image') {
+            previewHtml = `<img class="artifact-preview-image" src="${content}" onclick="openLightbox('${content}')" onerror="this.style.display='none'">`;
+          } else if (artifact.type !== 'markdown') {
+            const preview = content.substring(0, 200) + (content.length > 200 ? '...' : '');
+            previewHtml = `<div class="artifact-preview-code" onclick="openArtifact('${msg.artifactId}', ${version})">${escapeHtml(preview)}</div>`;
+          } else {
+            const preview = content.substring(0, 150) + (content.length > 150 ? '...' : '');
+            previewHtml = `<div class="artifact-preview-markdown" onclick="openArtifact('${msg.artifactId}', ${version})">${escapeHtml(preview)}</div>`;
+          }
+          
+          bodyContent = `
+            <div style="color: #888; font-size: 0.9rem; margin-bottom: 0.25rem;">${artifact.name} <span style="color: #555;">• v${version}</span></div>
+            ${previewHtml}
+          `;
+        } else {
+          bodyContent = parseMentions(escapeHtml(msg.text));
+        }
+      } else {
+        bodyContent = parseMentions(escapeHtml(msg.text));
+      }
+      
+      messageDiv.innerHTML = `
+        <div class="message-header">
+          <span class="message-author ${msg.authorType}">${formatName(msg.author)}</span>
+          <span class="message-time">${msg.time}</span>
+          <div class="message-actions">
+            <button class="message-action-btn" onclick="replyToMessage('${msg.id}')">REPLY</button>
+            <button class="message-action-btn" onclick="quoteMessage('${msg.id}')">QUOTE</button>
+            <button class="message-action-btn" onclick="sendToUser('${msg.author}', '${msg.id}')">SEND</button>
+          </div>
+        </div>
+        ${quoteHtml}
+        <div class="message-body"${bodyStyle}>${bodyContent}</div>
+      `;
+      
+      // Handle reply threading
+      if (msg.replyTo) {
+        // Create new thread
+        const parentMsg = document.getElementById(msg.replyTo);
+        if (parentMsg) {
+          // Check if already last
+          const allMessages = messagesContainer.children;
+          const lastChild = allMessages[allMessages.length - 1];
+          const isLastMessage = lastChild && (lastChild.id === msg.replyTo || lastChild.id === 'thread-' + msg.replyTo);
+          
+          let threadWrapper, threadContainer;
+          
+          if (isLastMessage && !threads[msg.replyTo]) {
+            // Convert in place
+            threadWrapper = document.createElement('div');
+            threadWrapper.className = 'thread-wrapper';
+            threadWrapper.id = 'thread-' + msg.replyTo;
+            parentMsg.parentNode.insertBefore(threadWrapper, parentMsg);
+            threadWrapper.appendChild(parentMsg);
+            
+            threadContainer = document.createElement('div');
+            threadContainer.className = 'message-thread';
+            threadContainer.id = 'replies-' + msg.replyTo;
+            threadWrapper.appendChild(threadContainer);
+            
+            threads[msg.replyTo] = {
+              wrapper: threadWrapper,
+              container: threadContainer,
+              replies: [msg],
+              expanded: false
+            };
+          } else if (!threads[msg.replyTo]) {
+            // Clone parent to bottom
+            threadWrapper = document.createElement('div');
+            threadWrapper.className = 'thread-wrapper';
+            threadWrapper.id = 'thread-' + msg.replyTo;
+            
+            const parentClone = parentMsg.cloneNode(true);
+            parentClone.id = msg.replyTo + '-thread';
+            threadWrapper.appendChild(parentClone);
+            
+            threadContainer = document.createElement('div');
+            threadContainer.className = 'message-thread';
+            threadContainer.id = 'replies-' + msg.replyTo;
+            threadWrapper.appendChild(threadContainer);
+            
+            messagesContainer.appendChild(threadWrapper);
+            
+            threads[msg.replyTo] = {
+              wrapper: threadWrapper,
+              container: threadContainer,
+              replies: [msg],
+              expanded: false
+            };
+          } else {
+            // Add to existing thread
+            threads[msg.replyTo].replies.push(msg);
+            messagesContainer.appendChild(threads[msg.replyTo].wrapper);
+          }
+          
+          renderThreadReplies(msg.replyTo);
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          return;
+        }
+      }
+      
+      messagesContainer.appendChild(messageDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function addArtifactToSidebar(artifact) {
+      // TODO: add to left sidebar artifacts list
+    }
+    
+    // Chat functions
+    let replyingTo = null; // { messageId, name, type }
+    let quotedText = null; // { text, name, type }
+    let messageIdCounter = 0;
+    let chatUsers = []; // Track users in chat for mentions
+    let threads = {}; // Track threads: { parentId: { element, replies: [], expanded: false } }
+    let noteNotifications = {}; // Track notifications: { noteId: true/false }
+    let notificationOrder = []; // Track order of notifications (oldest first)
+    let expandedNotes = {}; // Track which notes are expanded: { noteId: true/false }
+    
+    function handleChatEnter(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+    
+    function handleChatInput(event) {
+      const input = event.target;
+      const text = input.value;
+      const cursorPos = input.selectionStart;
+      
+      // Auto-resize textarea
+      input.style.height = '1.4em';
+      input.style.height = input.scrollHeight + 'px';
+      
+      // Check for @ mention (include ~ for bot names)
+      const textBeforeCursor = text.substring(0, cursorPos);
+      const atMatch = textBeforeCursor.match(/@([~\w-]*)$/);
+      
+      if (atMatch) {
+        showMentionsDropdown(atMatch[1]);
+      } else {
+        hideMentionsDropdown();
+      }
+    }
+    
+    function showMentionsDropdown(filter) {
+      const dropdown = document.getElementById('mentionsDropdown');
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      
+      // Add current user to chatUsers if not present
+      if (!chatUsers.find(u => u.name === session.name)) {
+        chatUsers.push({ name: session.name, type: session.type });
+      }
+      
+      // Combine users and all agents for mentions
+      const allMentionable = [
+        ...chatUsers,
+        ...registeredAgents.map(a => ({ name: a.name, type: 'agent' }))
+      ];
+      
+      // Remove duplicates by name
+      const unique = allMentionable.filter((item, index, arr) => 
+        arr.findIndex(x => x.name === item.name) === index
+      );
+      
+      // Filter by search
+      const filtered = unique.filter(u => 
+        u.name.toLowerCase().includes(filter.toLowerCase())
+      );
+      
+      if (filtered.length === 0) {
+        hideMentionsDropdown();
+        return;
+      }
+      
+      dropdown.innerHTML = filtered.map(u => `
+        <div class="mention-option ${u.type}" onclick="insertMention('${u.name}', '${u.type}')">${u.name}</div>
+      `).join('');
+      
+      dropdown.classList.add('open');
+    }
+    
+    function hideMentionsDropdown() {
+      document.getElementById('mentionsDropdown').classList.remove('open');
+    }
+    
+    function insertMention(name, type) {
+      const input = document.getElementById('chatInput');
+      const text = input.value;
+      const cursorPos = input.selectionStart;
+      
+      // Find the @ symbol before cursor
+      const textBeforeCursor = text.substring(0, cursorPos);
+      const atIndex = textBeforeCursor.lastIndexOf('@');
+      
+      // Replace @partial with @fullname
+      const newText = text.substring(0, atIndex) + '@' + name + ' ' + text.substring(cursorPos);
+      input.value = newText;
+      input.focus();
+      
+      hideMentionsDropdown();
+    }
+    
+    function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      
+      // Check for @mentions and auto-invite (only in non-Cover notes)
+      const note = notes[currentNoteId];
+      if (note && !note.isSpecial) {
+        const mentions = text.match(/@[~\w-]+/g);
+        if (mentions) {
+          mentions.forEach(mention => {
+            const mentionedName = mention.slice(1); // Remove @
+            // Find user
+            const mentionedUser = chatUsers.find(u => u.name === mentionedName);
+            if (mentionedUser && mentionedUser.type !== 'agent') {
+              // Check if already in note
+              if (!note.users || !note.users.includes(mentionedName)) {
+                // Auto-invite
+                doInvite(mentionedName);
+              }
+            }
+          });
+        }
+      }
+      
+      // Build message data for server
+      const messageData = {
+        text: text,
+        noteId: currentNoteId,
+        replyTo: replyingTo ? replyingTo.messageId : null,
+        quote: quotedText ? {
+          html: quotedText.html,
+          name: quotedText.name,
+          type: quotedText.type
+        } : null
+      };
+      
+      // Send to server
+      socket.emit('message', messageData);
+      
+      input.value = '';
+      input.style.height = '1.4em'; // Reset height
+      
+      // Clear reply and quote state
+      cancelReply();
+      cancelQuote();
+    }
+    
+    function addReplyToThread(parentId, replyId, session, timeStr, parsedText, quoteHtml, rawText) {
+      const messagesContainer = document.getElementById('chatMessages');
+      const parentMsg = document.getElementById(parentId);
+      
+      if (!parentMsg) return;
+      
+      // Check if parent is the last message (no need to bump)
+      const allMessages = messagesContainer.children;
+      const lastChild = allMessages[allMessages.length - 1];
+      const isLastMessage = lastChild && (lastChild.id === parentId || lastChild.id === 'thread-' + parentId);
+      
+      // Check if this parent already has a thread at bottom
+      let threadContainer;
+      let threadWrapper;
+      
+      if (threads[parentId]) {
+        // Thread exists - bump it to bottom (unless already last)
+        threadWrapper = threads[parentId].wrapper;
+        threadContainer = threads[parentId].container;
+        
+        if (!isLastMessage) {
+          // Move thread to bottom (bump)
+          messagesContainer.appendChild(threadWrapper);
+        }
+      } else if (isLastMessage && !parentMsg.classList.contains('thread-wrapper')) {
+        // Parent is last message - convert it in place to a thread
+        threadWrapper = document.createElement('div');
+        threadWrapper.className = 'thread-wrapper';
+        threadWrapper.id = 'thread-' + parentId;
+        
+        // Move the actual parent into the wrapper (not clone)
+        parentMsg.parentNode.insertBefore(threadWrapper, parentMsg);
+        threadWrapper.appendChild(parentMsg);
+        
+        // Create thread container for replies
+        threadContainer = document.createElement('div');
+        threadContainer.className = 'message-thread';
+        threadContainer.id = 'replies-' + parentId;
+        threadWrapper.appendChild(threadContainer);
+        
+        threads[parentId] = {
+          wrapper: threadWrapper,
+          container: threadContainer,
+          replies: [],
+          expanded: false
+        };
+      } else {
+        // Create new thread - clone parent to bottom
+        threadWrapper = document.createElement('div');
+        threadWrapper.className = 'thread-wrapper';
+        threadWrapper.id = 'thread-' + parentId;
+        
+        // Clone the parent message
+        const parentClone = parentMsg.cloneNode(true);
+        parentClone.id = parentId + '-thread';
+        // Keep REPLY button but point it to the original parent ID
+        const actions = parentClone.querySelector('.message-actions');
+        const parentAuthor = parentMsg.getAttribute('data-author');
+        if (actions) {
+          actions.innerHTML = `
+            <button class="message-action-btn" onclick="replyToMessage('${parentId}')">REPLY</button>
+            <button class="message-action-btn" onclick="quoteMessage('${parentId}')">QUOTE</button>
+            <button class="message-action-btn" onclick="sendToUser('${parentAuthor}', '${parentId}')">SEND</button>
+          `;
+        }
+        
+        threadWrapper.appendChild(parentClone);
+        
+        // Create thread container for replies
+        threadContainer = document.createElement('div');
+        threadContainer.className = 'message-thread';
+        threadContainer.id = 'replies-' + parentId;
+        threadWrapper.appendChild(threadContainer);
+        
+        messagesContainer.appendChild(threadWrapper);
+        
+        threads[parentId] = {
+          wrapper: threadWrapper,
+          container: threadContainer,
+          replies: [],
+          expanded: false
+        };
+      }
+      
+      // Create the reply message
+      const replyDiv = document.createElement('div');
+      replyDiv.className = 'message';
+      replyDiv.id = replyId;
+      replyDiv.setAttribute('data-author', session.name);
+      replyDiv.setAttribute('data-author-type', session.type);
+      replyDiv.setAttribute('data-text', rawText);
+      replyDiv.innerHTML = `
+        <div class="message-header">
+          <span class="message-author ${session.type}">${formatName(session.name)}</span>
+          <span class="message-time">${timeStr}</span>
+        </div>
+        ${quoteHtml}
+        <div class="message-body">${parsedText}</div>
+      `;
+      
+      // Add to replies array
+      threads[parentId].replies.push(replyDiv);
+      
+      // Render visible replies (first 3 or all if expanded)
+      renderThreadReplies(parentId);
+    }
+    
+    function renderThreadReplies(parentId) {
+      const thread = threads[parentId];
+      if (!thread) return;
+      
+      const container = thread.container;
+      container.innerHTML = '';
+      
+      const replies = thread.replies;
+      const expanded = thread.expanded;
+      const visibleCount = expanded ? replies.length : Math.min(3, replies.length);
+      
+      // Show visible replies
+      for (let i = 0; i < visibleCount; i++) {
+        const reply = replies[i];
+        
+        // If reply is a DOM element, use it directly. If it's a message object, create element.
+        let replyDiv;
+        if (reply instanceof HTMLElement) {
+          replyDiv = reply;
+        } else {
+          // Create element from message object
+          replyDiv = document.createElement('div');
+          replyDiv.className = 'message';
+          replyDiv.id = reply.id;
+          replyDiv.setAttribute('data-author', reply.author);
+          replyDiv.setAttribute('data-author-type', reply.authorType);
+          replyDiv.setAttribute('data-text', reply.text);
+          
+          let bodyStyle = '';
+          if (reply.isNockSend) {
+            bodyStyle = ' style="color: var(--green);"';
+          }
+          
+          const parsedText = parseMentions(escapeHtml(reply.text));
+          
+          replyDiv.innerHTML = `
+            <div class="message-header">
+              <span class="message-author ${reply.authorType}">${formatName(reply.author)}</span>
+              <span class="message-time">${reply.time}</span>
+            </div>
+            <div class="message-body"${bodyStyle}>${parsedText}</div>
+          `;
+        }
+        
+        container.appendChild(replyDiv);
+      }
+      
+      // Show expand button if there are hidden replies
+      const hiddenCount = replies.length - visibleCount;
+      if (hiddenCount > 0) {
+        const expandBtn = document.createElement('div');
+        expandBtn.className = 'thread-expand';
+        expandBtn.textContent = `▼ ${hiddenCount} more ${hiddenCount === 1 ? 'reply' : 'replies'}`;
+        expandBtn.onclick = () => expandThread(parentId);
+        container.appendChild(expandBtn);
+      } else if (expanded && replies.length > 3) {
+        // Show collapse button
+        const collapseBtn = document.createElement('div');
+        collapseBtn.className = 'thread-expand';
+        collapseBtn.textContent = '▲ Show less';
+        collapseBtn.onclick = () => collapseThread(parentId);
+        container.appendChild(collapseBtn);
+      }
+    }
+    
+    function expandThread(parentId) {
+      if (threads[parentId]) {
+        threads[parentId].expanded = true;
+        renderThreadReplies(parentId);
+      }
+    }
+    
+    function collapseThread(parentId) {
+      if (threads[parentId]) {
+        threads[parentId].expanded = false;
+        renderThreadReplies(parentId);
+      }
+    }
+    
+    // Format name (no special handling needed)
+    function formatName(name) {
+      return name;
+    }
+    
+    function parseMentions(text) {
+      // Replace @username with styled mention spans
+      return text.replace(/@([~\w-]+)/g, (match, name) => {
+        // Check chatUsers first
+        let user = chatUsers.find(u => u.name === name);
+        if (!user) {
+          // Check if it's a registered agent
+          const agent = registeredAgents.find(a => a.name === name);
+          if (agent) {
+            user = { name: name, type: 'agent' };
+          }
+        }
+        const type = user ? user.type : 'visitor';
+        return `<span class="mention ${type}">@${name}</span>`;
+      });
+    }
+    
+    function replyToMessage(messageId) {
+      const msg = document.getElementById(messageId);
+      if (!msg) return;
+      const name = msg.getAttribute('data-author');
+      const type = msg.getAttribute('data-author-type');
+      setReplyTo(messageId, name, type);
+    }
+    
+    function quoteMessage(messageId) {
+      const msg = document.getElementById(messageId);
+      if (!msg) return;
+      const name = msg.getAttribute('data-author');
+      const type = msg.getAttribute('data-author-type');
+      // Get the actual message body HTML for artifact previews
+      const bodyEl = msg.querySelector('.message-body');
+      const bodyHtml = bodyEl ? bodyEl.innerHTML : msg.getAttribute('data-text');
+      const bodyText = bodyEl ? bodyEl.textContent.trim().substring(0, 50) : msg.getAttribute('data-text');
+      setQuote(bodyHtml, bodyText, name, type);
+    }
+    
+    function setReplyTo(messageId, name, type) {
+      replyingTo = { messageId, name, type };
+      document.getElementById('replyToName').textContent = name;
+      document.getElementById('replyToName').className = type;
+      document.getElementById('replyIndicator').classList.add('active');
+      document.getElementById('chatInput').focus();
+    }
+    
+    function cancelReply() {
+      replyingTo = null;
+      document.getElementById('replyIndicator').classList.remove('active');
+    }
+    
+    function setQuote(html, previewText, name, type) {
+      quotedText = { html, name, type };
+      // Show truncated text preview in the indicator
+      document.getElementById('quoteText').textContent = previewText + (previewText.length >= 50 ? '...' : '');
+      document.getElementById('quoteIndicator').classList.add('active');
+      document.getElementById('chatInput').focus();
+    }
+    
+    function cancelQuote() {
+      quotedText = null;
+      document.getElementById('quoteIndicator').classList.remove('active');
+    }
+    
+    function scrollToMessage(messageId) {
+      const msg = document.getElementById(messageId);
+      if (msg) {
+        msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        msg.style.background = '#1a1a1a';
+        setTimeout(() => {
+          msg.style.background = '';
+        }, 1500);
+      }
+    }
+    
+    // Quote selection handling
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Artifact functions
+    const artifacts = {
+      'urbit-setup': {
+        name: 'urbit-setup-guide',
+        type: 'markdown',
+        creator: '~disden-talhes-figbud',
+        version: 1,
+        modified: '5 min ago',
+        content: `# Getting Started with Urbit
+
+## What is Urbit?
+Urbit is a personal server that gives you complete ownership of your digital identity and data.
+
+## Quick Setup
+1. Get a planet (your Urbit ID) from a friend, buy one, or boot a comet
+2. Download Port or run from command line
+3. Boot your ship with your keyfile
+4. You're on the network!
+
+## Resources
+- urbit.org - Official docs
+- ~bitbet-bolbel/urbit-community - Main group
+- operators.urbit.org - For running your own infrastructure`
+      },
+      'auth-handler': {
+        name: 'auth-handler.js',
+        type: 'javascript',
+        creator: '~disden-talhes-figbud',
+        version: 3,
+        modified: '2 min ago',
+        content: `// GRIMOIRE Auth Handler v3
+// Contributors: ~disden-talhes, ~disden-talhes-figbud
+
+async function authenticateUser(credentials) {
+  const { type, name } = credentials;
+  
+  // Validate based on identity type
+  if (type === 'urbit') {
+    return validateUrbitId(name);
+  } else if (type === 'agent') {
+    return validateAgentId(name);
+  } else {
+    // Visitor - always valid
+    return { valid: true, identity: name };
+  }
+}
+
+function validateUrbitId(name) {
+  // For demo: accept any ~name format
+  const isValid = name.startsWith('~');
+  return { 
+    valid: isValid, 
+    identity: name,
+    type: 'urbit'
+  };
+}
+
+function validateAgentId(name) {
+  // Agents should be moon format
+  const parts = name.replace('~', '').split('-');
+  const isMoon = parts.length >= 4;
+  return {
+    valid: isMoon,
+    identity: name,
+    type: 'agent'
+  };
+}
+
+export { authenticateUser };`
+      }
+    };
+    
+    function renderSimpleMarkdown(text) {
+      return text
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/^## (.*$)/gm, '<h2 style="color: var(--amber); margin-top: 1rem;">$1</h2>')
+        .replace(/^# (.*$)/gm, '<h1 style="color: var(--amber); margin-bottom: 0.5rem;">$1</h1>')
+        .replace(/^\d+\. (.*$)/gm, '<div style="margin-left: 1rem;">• $1</div>')
+        .replace(/^- (.*$)/gm, '<div style="margin-left: 1rem;">• $1</div>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>');
+    }
+    
+    // Artifact menu functions
+    let currentArtifactType = null;
+    
+    function toggleArtifactMenu() {
+      const menu = document.getElementById('artifactMenu');
+      menu.classList.toggle('open');
+    }
+    
+    function openArtifactModal(type) {
+      currentArtifactType = type;
+      const menu = document.getElementById('artifactMenu');
+      const modal = document.getElementById('artifactModal');
+      const title = document.getElementById('modalTitle');
+      const nameField = document.getElementById('nameField');
+      const languageField = document.getElementById('languageField');
+      const contentField = document.getElementById('contentField');
+      const imageField = document.getElementById('imageField');
+      const imageCommentField = document.getElementById('imageCommentField');
+      
+      menu.classList.remove('open');
+      
+      // Configure modal based on type
+      if (type === 'markdown') {
+        title.textContent = 'Create Markdown';
+        nameField.style.display = 'flex';
+        languageField.style.display = 'none';
+        contentField.style.display = 'flex';
+        imageField.style.display = 'none';
+        imageCommentField.style.display = 'none';
+      } else if (type === 'code') {
+        title.textContent = 'Create Code';
+        nameField.style.display = 'flex';
+        languageField.style.display = 'flex';
+        contentField.style.display = 'flex';
+        imageField.style.display = 'none';
+        imageCommentField.style.display = 'none';
+      } else if (type === 'image') {
+        title.textContent = 'Add Image';
+        nameField.style.display = 'none';
+        languageField.style.display = 'none';
+        contentField.style.display = 'none';
+        imageField.style.display = 'flex';
+        imageCommentField.style.display = 'flex';
+      }
+      
+      // Clear inputs
+      document.getElementById('artifactNameInput').value = '';
+      document.getElementById('artifactContentInput').value = '';
+      document.getElementById('artifactImageUrl').value = '';
+      document.getElementById('artifactImageComment').value = '';
+      
+      modal.classList.add('open');
+      if (type === 'image') {
+        document.getElementById('artifactImageComment').focus();
+      } else {
+        document.getElementById('artifactNameInput').focus();
+      }
+    }
+    
+    function closeArtifactModal() {
+      document.getElementById('artifactModal').classList.remove('open');
+      currentArtifactType = null;
+      editingArtifactId = null;
+      document.querySelector('.modal-submit-btn').textContent = 'CREATE';
+      document.getElementById('artifactNameInput').disabled = false;
+    }
+    
+    // Helper to get formatted time string
+    function getTimeString() {
+      const now = new Date();
+      return now.getHours().toString().padStart(2, '0') + ':' + 
+             now.getMinutes().toString().padStart(2, '0');
+    }
+    
+    // Edit artifact tracking
+    let editingArtifactId = null;
+    
+    function submitArtifact() {
+      if (editingArtifactId) {
+        // We're editing an existing artifact
+        const newContent = document.getElementById('artifactContentInput').value;
+        
+        if (!newContent) {
+          alert('Please enter content');
+          return;
+        }
+        
+        // Send edit to server
+        socket.emit('editArtifact', {
+          artifactId: editingArtifactId,
+          content: newContent
+        });
+        
+        // Reset
+        editingArtifactId = null;
+        document.querySelector('.modal-submit-btn').textContent = 'CREATE';
+        document.getElementById('artifactNameInput').disabled = false;
+        closeArtifactModal();
+      } else {
+        // Creating new artifact
+        let name = document.getElementById('artifactNameInput').value.trim();
+        let content = '';
+        let comment = '';
+        
+        if (currentArtifactType === 'image') {
+          content = document.getElementById('artifactImageUrl').value.trim();
+          comment = document.getElementById('artifactImageComment').value.trim();
+          if (!content) {
+            alert('Please enter an image URL');
+            return;
+          }
+          name = 'image-' + Date.now();
+        } else {
+          if (!name) {
+            alert('Please enter a name');
+            return;
+          }
+          content = document.getElementById('artifactContentInput').value;
+          if (!content) {
+            alert('Please enter content');
+            return;
+          }
+        }
+        
+        const artifactType = currentArtifactType === 'code' ? document.getElementById('artifactLanguage').value : currentArtifactType;
+        
+        // Send to server
+        socket.emit('createArtifact', {
+          name: name,
+          type: artifactType,
+          content: content,
+          comment: comment
+        });
+        
+        closeArtifactModal();
+      }
+    }
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const menu = document.getElementById('artifactMenu');
+      const btn = document.querySelector('.chat-action-btn');
+      if (!menu.contains(e.target) && e.target !== btn) {
+        menu.classList.remove('open');
+      }
+    });
+    
+    // Resize functionality
+    let isResizing = false;
+    let currentHandle = null;
+    let startX = 0;
+    let startWidth = 0;
+    
+    const leftSidebar = document.querySelector('.left-sidebar');
+    const rightSidebar = document.getElementById('rightSidebar');
+    const leftHandle = document.getElementById('leftResizeHandle');
+    const rightHandle = document.getElementById('rightResizeHandle');
+    
+    leftHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      currentHandle = 'left';
+      startX = e.clientX;
+      startWidth = leftSidebar.offsetWidth;
+      leftHandle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+    
+    rightHandle.addEventListener('mousedown', (e) => {
+      isResizing = true;
+      currentHandle = 'right';
+      startX = e.clientX;
+      startWidth = rightSidebar.offsetWidth;
+      rightHandle.classList.add('dragging');
+      rightSidebar.classList.add('resizing');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizing) return;
+      
+      if (currentHandle === 'left') {
+        const diff = e.clientX - startX;
+        const newWidth = Math.min(Math.max(startWidth + diff, 150), 400);
+        leftSidebar.style.width = newWidth + 'px';
+      } else if (currentHandle === 'right') {
+        const diff = startX - e.clientX;
+        const newWidth = Math.min(Math.max(startWidth + diff, 250), 600);
+        rightSidebar.style.width = newWidth + 'px';
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (isResizing) {
+        isResizing = false;
+        leftHandle.classList.remove('dragging');
+        rightHandle.classList.remove('dragging');
+        rightSidebar.classList.remove('resizing');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        currentHandle = null;
+      }
+    });
+    
+    // Track currently open artifact for editing
+    let currentOpenArtifactId = null;
+    
+    // Show right resize handle when sidebar opens
+    function openArtifact(id, versionNum) {
+      const artifact = artifacts[id];
+      if (!artifact) return;
+      
+      currentOpenArtifactId = id;
+      
+      // Get the specific version or latest
+      let versionData;
+      let content;
+      let version;
+      let modified;
+      let editor;
+      let editorType;
+      
+      if (artifact.versions && artifact.versions.length > 0) {
+        // New format with versions array
+        if (versionNum) {
+          versionData = artifact.versions.find(v => v.version === versionNum);
+        }
+        if (!versionData) {
+          versionData = artifact.versions[artifact.versions.length - 1]; // latest
+        }
+        content = versionData.content;
+        version = versionData.version;
+        modified = versionData.modified;
+        editor = versionData.editor;
+        editorType = versionData.editorType;
+      } else {
+        // Old format fallback
+        content = artifact.content;
+        version = artifact.version || 1;
+        modified = artifact.modified;
+        editor = artifact.creator;
+        editorType = artifact.creatorType;
+      }
+      
+      document.getElementById('artifactTitle').textContent = artifact.name;
+      
+      const creatorColor = artifact.creatorType === 'agent' ? 'var(--green)' : 
+                          artifact.creatorType === 'urbit' ? 'var(--amber)' : 'var(--blue)';
+      
+      const editorColor = editorType === 'agent' ? 'var(--green)' : 
+                          editorType === 'urbit' ? 'var(--amber)' : 'var(--blue)';
+      
+      let contributorsHtml = '';
+      if (artifact.contributors && artifact.contributors.length > 0) {
+        contributorsHtml = `<span><strong>Contributors:</strong> ${artifact.contributors.join(', ')}</span>`;
+      }
+      
+      // Show edit button for code and markdown only (edits latest version)
+      let editBtnHtml = '';
+      if (artifact.type !== 'image') {
+        editBtnHtml = `<button class="edit-artifact-btn" onclick="editArtifact('${id}')">EDIT</button>`;
+      }
+      
+      // Show total versions count
+      const totalVersions = artifact.versions ? artifact.versions.length : 1;
+      
+      document.getElementById('artifactMeta').innerHTML = `
+        <span><strong>Creator:</strong> <span style="color: ${creatorColor}">${artifact.creator}</span></span>
+        ${contributorsHtml}
+        <span><strong>Type:</strong> ${artifact.type}</span>
+        <span><strong>Version:</strong> ${version} of ${totalVersions}</span>
+        <span><strong>Modified:</strong> ${modified} by <span style="color: ${editorColor}">${editor}</span></span>
+        ${editBtnHtml}
+      `;
+      
+      const contentEl = document.getElementById('artifactContent');
+      if (artifact.type === 'html') {
+        contentEl.innerHTML = `<iframe srcdoc="${escapeHtml(content).replace(/"/g, '&quot;')}" style="width: 100%; height: 300px; border: 1px solid #333; background: #fff;"></iframe>`;
+      } else if (artifact.type === 'javascript' || artifact.type === 'code' || artifact.type === 'python' || artifact.type === 'hoon' || artifact.type === 'css' || artifact.type === 'other') {
+        contentEl.innerHTML = `<pre><code>${escapeHtml(content)}</code></pre>`;
+      } else if (artifact.type === 'image') {
+        contentEl.innerHTML = `<img src="${content}" style="max-width: 100%; height: auto;">`;
+      } else {
+        contentEl.innerHTML = renderSimpleMarkdown(content);
+      }
+      
+      document.getElementById('rightSidebar').classList.add('open');
+      document.getElementById('rightResizeHandle').style.display = 'block';
+    }
+    
+    function closeArtifact() {
+      document.getElementById('rightSidebar').classList.remove('open');
+      document.getElementById('rightResizeHandle').style.display = 'none';
+      currentOpenArtifactId = null;
+    }
+    
+    function editArtifact(id) {
+      const artifact = artifacts[id];
+      if (!artifact) return;
+      
+      editingArtifactId = id;
+      
+      const modal = document.getElementById('artifactModal');
+      const title = document.getElementById('modalTitle');
+      const languageField = document.getElementById('languageField');
+      const contentField = document.getElementById('contentField');
+      const imageField = document.getElementById('imageField');
+      const submitBtn = document.querySelector('.modal-submit-btn');
+      
+      // Set modal title
+      title.textContent = 'Edit: ' + artifact.name;
+      submitBtn.textContent = 'SAVE';
+      
+      // Configure modal based on type
+      if (artifact.type === 'markdown') {
+        currentArtifactType = 'markdown';
+        languageField.style.display = 'none';
+        contentField.style.display = 'flex';
+        imageField.style.display = 'none';
+      } else {
+        currentArtifactType = 'code';
+        languageField.style.display = 'flex';
+        contentField.style.display = 'flex';
+        imageField.style.display = 'none';
+        document.getElementById('artifactLanguage').value = artifact.type;
+      }
+      
+      // Pre-fill content - get latest version
+      document.getElementById('artifactNameInput').value = artifact.name;
+      document.getElementById('artifactNameInput').disabled = true;
+      
+      let latestContent;
+      if (artifact.versions && artifact.versions.length > 0) {
+        latestContent = artifact.versions[artifact.versions.length - 1].content;
+      } else {
+        latestContent = artifact.content;
+      }
+      document.getElementById('artifactContentInput').value = latestContent;
+      
+      modal.classList.add('open');
+    }
+    
+    // Lightbox functions
+    function openLightbox(src) {
+      document.getElementById('lightboxImage').src = src;
+      document.getElementById('lightbox').classList.add('open');
+    }
+    
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+    }
+    
+    // Wallet functions
+    function initWallet() {
+      let wallet = localStorage.getItem('grimoire_wallet');
+      if (!wallet) {
+        wallet = {
+          balance: 100000.00,
+          transactions: []
+        };
+        localStorage.setItem('grimoire_wallet', JSON.stringify(wallet));
+      }
+      return JSON.parse(localStorage.getItem('grimoire_wallet'));
+    }
+    
+    function saveWallet(wallet) {
+      localStorage.setItem('grimoire_wallet', JSON.stringify(wallet));
+    }
+    
+    function formatBalance(amount) {
+      return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $NOCK';
+    }
+    
+    // Store current wallet state from server
+    let currentWallet = { balance: 100000, transactions: [] };
+    
+    function toggleWallet() {
+      document.getElementById('walletBalance').textContent = formatBalance(currentWallet.balance);
+      renderTransactions(currentWallet.transactions);
+      document.getElementById('walletOverlay').classList.add('open');
+    }
+    
+    function closeWallet() {
+      document.getElementById('walletOverlay').classList.remove('open');
+    }
+    
+    function renderTransactions(transactions) {
+      const container = document.getElementById('walletTransactions');
+      
+      if (transactions.length === 0) {
+        container.innerHTML = '<div class="wallet-empty">No transactions yet</div>';
+        return;
+      }
+      
+      container.innerHTML = transactions.slice().reverse().map(tx => `
+        <div class="wallet-transaction">
+          <div class="wallet-transaction-row">
+            <span class="wallet-transaction-who">${tx.type === 'sent' ? 'To: ' : 'From: '}${tx.who}</span>
+            <span class="wallet-transaction-amount ${tx.type}">${tx.type === 'sent' ? '-' : '+'}${formatBalance(tx.amount).replace(' $NOCK', '')} $NOCK</span>
+          </div>
+          <div class="wallet-transaction-time">${tx.time}</div>
+        </div>
+      `).join('');
+    }
+    
+    function openSendModal() {
+      document.getElementById('sendTo').value = '';
+      document.getElementById('sendAmount').value = '';
+      document.getElementById('sendModal').classList.add('open');
+      document.getElementById('sendTo').focus();
+    }
+    
+    function closeSendModal() {
+      document.getElementById('sendModal').classList.remove('open');
+    }
+    
+    function openRequestModal() {
+      document.getElementById('requestFrom').value = '';
+      document.getElementById('requestAmount').value = '';
+      document.getElementById('requestModal').classList.add('open');
+      document.getElementById('requestFrom').focus();
+    }
+    
+    function closeRequestModal() {
+      document.getElementById('requestModal').classList.remove('open');
+    }
+    
+    function openContractsModal() {
+      document.getElementById('contractsModal').classList.add('open');
+    }
+    
+    function closeContractsModal() {
+      document.getElementById('contractsModal').classList.remove('open');
+    }
+    
+    function sendNock() {
+      const to = document.getElementById('sendTo').value.trim();
+      const amount = parseFloat(document.getElementById('sendAmount').value);
+      
+      if (!to) {
+        alert('Please enter a recipient');
+        return;
+      }
+      
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+      
+      const sourceMessageId = document.getElementById('sendModal').getAttribute('data-source-message');
+      
+      // Send to server
+      socket.emit('sendNock', {
+        to: to,
+        amount: amount,
+        replyToMessageId: sourceMessageId || null
+      });
+      
+      closeSendModal();
+      closeWallet();
+    }
+    
+    function sendToUser(recipient, messageId) {
+      document.getElementById('sendTo').value = recipient;
+      document.getElementById('sendAmount').value = '';
+      document.getElementById('sendModal').classList.add('open');
+      document.getElementById('sendModal').setAttribute('data-source-message', messageId || '');
+      document.getElementById('sendAmount').focus();
+    }
+    
+    function requestNock() {
+      const from = document.getElementById('requestFrom').value.trim();
+      const amount = parseFloat(document.getElementById('requestAmount').value);
+      
+      if (!from) {
+        alert('Please enter who to request from');
+        return;
+      }
+      
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+      
+      // Send to server
+      socket.emit('requestNock', {
+        from: from,
+        amount: amount
+      });
+      
+      closeRequestModal();
+      closeWallet();
+    }
+    
+    function selectContract(type) {
+      alert('Contract deployment coming soon: ' + type);
+      closeContractsModal();
+    }
+    
+    // Agent functions
+    
+    function openAgentModal() {
+      document.getElementById('agentName').value = '';
+      document.getElementById('agentWebhook').value = '';
+      document.getElementById('agentModal').classList.add('open');
+      document.getElementById('agentName').focus();
+    }
+    
+    function closeAgentModal() {
+      document.getElementById('agentModal').classList.remove('open');
+    }
+    
+    function launchAgent() {
+      const name = document.getElementById('agentName').value.trim();
+      const webhookUrl = document.getElementById('agentWebhook').value.trim();
+      
+      if (!name) {
+        alert('Please enter an agent name');
+        return;
+      }
+      
+      if (!webhookUrl) {
+        alert('Please enter a webhook URL');
+        return;
+      }
+      
+      // Register with server
+      socket.emit('registerBot', {
+        name: name,
+        webhookUrl: webhookUrl
+      });
+      
+      closeAgentModal();
+    }
+    
+    socket.on('botRegistered', (data) => {
+      console.log('Bot registered:', data);
+      if (data.success) {
+        // Store with owner info
+        registeredAgents.push({ name: data.name, owner: data.owner });
+        renderAgentsList();
+      }
+    });
+    
+    socket.on('agentsList', (agents) => {
+      // agents is now array of { name, owner }
+      registeredAgents = agents;
+      renderAgentsList();
+    });
+    
+    function renderAgentsList() {
+      const container = document.getElementById('agentsList');
+      
+      // Get current user
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      
+      // Show all agents, but indicate ownership
+      if (registeredAgents.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      container.innerHTML = registeredAgents.map(agent => {
+        const isMine = agent.owner === myName;
+        return `
+          <div class="agent-item ${isMine ? 'mine' : ''}">
+            <span class="agent-item-status"></span>
+            <span>${agent.name}</span>
+            ${!isMine ? `<span class="agent-owner">(${agent.owner})</span>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // ============================================
+    // NOTE SYSTEM
+    // ============================================
+    
+    let currentNoteId = 'cover';
+    let notes = {
+      cover: {
+        id: 'cover',
+        name: 'Cover',
+        type: 'notebook', // notebook, dm, group
+        users: [], // everyone has access to cover
+        messages: [],
+        children: [],
+        parent: null,
+        isSpecial: true
+      }
+    };
+    let expandedSections = { shared: false, notes: false, agents: true };
+    
+    // Initialize sections on load
+    function initSections() {
+      // Agents expanded by default
+      document.getElementById('agentsArrow').classList.add('expanded');
+      document.getElementById('agentsContent').classList.add('expanded');
+    }
+    
+    function toggleSection(section) {
+      expandedSections[section] = !expandedSections[section];
+      const arrow = document.getElementById(section + 'Arrow');
+      const content = document.getElementById(section + 'Content');
+      
+      if (expandedSections[section]) {
+        arrow.classList.add('expanded');
+        content.classList.add('expanded');
+      } else {
+        arrow.classList.remove('expanded');
+        content.classList.remove('expanded');
+      }
+    }
+    
+    function openNote(noteId) {
+      const note = notes[noteId];
+      if (!note) return;
+      
+      // Update current note
+      currentNoteId = noteId;
+      
+      // Clear notification for this specific note (not children)
+      if (noteId !== 'cover') {
+        clearNotification(noteId);
+      }
+      
+      // Update header name and color
+      const nameEl = document.getElementById('currentNoteName');
+      
+      // Special handling for Ars Notoria (cover)
+      if (noteId === 'cover') {
+        nameEl.textContent = 'ARS NOTORIA';
+        nameEl.classList.remove('dm-urbit', 'dm-visitor', 'dm-agent');
+      } else {
+        nameEl.textContent = note.name;
+        
+        // Remove old color classes
+        nameEl.classList.remove('dm-urbit', 'dm-visitor', 'dm-agent');
+        
+        // Add color class for DMs based on name
+        if (note.type === 'dm') {
+          const otherUser = chatUsers.find(u => u.name === note.name);
+          if (otherUser) {
+            nameEl.classList.add('dm-' + otherUser.type);
+          }
+        }
+      }
+      
+      // Update sidebar active states
+      document.querySelectorAll('.cover-note, .note-item').forEach(el => {
+        el.classList.remove('active');
+      });
+      
+      if (noteId === 'cover') {
+        document.getElementById('coverNote').classList.add('active');
+      } else {
+        const noteEl = document.querySelector(`[data-note-id="${noteId}"]`);
+        if (noteEl) {
+          noteEl.classList.add('active');
+          
+          // Auto-expand section to show active note
+          if (note.type === 'dm' && !note.parent && !expandedSections.shared) {
+            toggleSection('shared');
+          } else if (note.type === 'notebook' && !note.parent && !expandedSections.notes) {
+            toggleSection('notes');
+          }
+        }
+      }
+      
+      // Clear and load messages for this note
+      const messagesContainer = document.getElementById('chatMessages');
+      messagesContainer.innerHTML = '';
+      
+      // Reset threads for this note view
+      threads = {};
+      
+      // Initialize messages array if needed
+      if (!note.messages) {
+        note.messages = [];
+      }
+      
+      // Load messages for this note
+      note.messages.forEach(msg => {
+        renderMessage(msg);
+      });
+      
+      // Tell server we switched notes
+      socket.emit('switchNote', { noteId: noteId });
+    }
+    
+    function createNewNote(parentId = null) {
+      // Generate hierarchical name
+      let noteName;
+      if (parentId && notes[parentId]) {
+        const parentNote = notes[parentId];
+        const siblingCount = parentNote.children ? parentNote.children.length : 0;
+        // Extract parent's number (e.g., "Note 1" -> "1", "Note 1.2" -> "1.2")
+        const parentMatch = parentNote.name.match(/Note\s+([\d.]+)/);
+        if (parentMatch) {
+          noteName = `Note ${parentMatch[1]}.${siblingCount + 1}`;
+        } else {
+          noteName = `${parentNote.name}.${siblingCount + 1}`;
+        }
+      } else {
+        // Top-level note - count existing top-level notebooks
+        const topLevelNotebooks = Object.values(notes).filter(n => 
+          !n.isSpecial && !n.parent && n.type === 'notebook'
+        );
+        noteName = `Note ${topLevelNotebooks.length + 1}`;
+      }
+      
+      // Ask server to create note - server assigns ID
+      socket.emit('createNote', { 
+        name: noteName, 
+        parentId: parentId 
+      });
+      
+      // Note will be added to local state when server responds with 'noteCreated'
+    }
+    
+    // Notification helpers
+    function addNotification(noteId) {
+      if (noteId === 'cover') return; // No notifications for ARS NOTORIA
+      
+      // Add notification to this note
+      if (!noteNotifications[noteId]) {
+        noteNotifications[noteId] = true;
+        // Add to order list if not already there
+        if (!notificationOrder.includes(noteId)) {
+          notificationOrder.push(noteId);
+        }
+      }
+      
+      renderNotesList();
+    }
+    
+    function clearNotification(noteId) {
+      noteNotifications[noteId] = false;
+      // Remove from order list
+      const idx = notificationOrder.indexOf(noteId);
+      if (idx > -1) {
+        notificationOrder.splice(idx, 1);
+      }
+      renderNotesList();
+    }
+    
+    // Check if note or any descendants have notifications
+    function hasNotification(noteId) {
+      if (noteNotifications[noteId]) return true;
+      
+      const note = notes[noteId];
+      if (note && note.children) {
+        for (const childId of note.children) {
+          if (hasNotification(childId)) return true;
+        }
+      }
+      return false;
+    }
+    
+    // Get top-level parent of a note
+    function getTopLevelParent(noteId) {
+      const note = notes[noteId];
+      if (!note || !note.parent) return noteId;
+      return getTopLevelParent(note.parent);
+    }
+    
+    // Get notification order for a top-level note (oldest notification timestamp)
+    function getNotificationPriority(noteId) {
+      // Find the earliest notification in this tree
+      const findEarliest = (nId) => {
+        const idx = notificationOrder.indexOf(nId);
+        let earliest = idx > -1 ? idx : Infinity;
+        
+        const note = notes[nId];
+        if (note && note.children) {
+          for (const childId of note.children) {
+            const childEarliest = findEarliest(childId);
+            if (childEarliest < earliest) earliest = childEarliest;
+          }
+        }
+        return earliest;
+      };
+      
+      return findEarliest(noteId);
+    }
+    
+    function renderNotesList() {
+      const sharedList = document.getElementById('sharedList');
+      const notesList = document.getElementById('notesList');
+      
+      sharedList.innerHTML = '';
+      notesList.innerHTML = '';
+      
+      // Get top-level notes and sort by notification priority
+      const topLevelNotes = Object.values(notes).filter(note => {
+        if (note.isSpecial) return false;
+        if (note.parent) return false;
+        return true;
+      });
+      
+      // Sort: notes with notifications first (oldest first), then notes without
+      topLevelNotes.sort((a, b) => {
+        const aHasNotif = hasNotification(a.id);
+        const bHasNotif = hasNotification(b.id);
+        
+        if (aHasNotif && !bHasNotif) return -1;
+        if (!aHasNotif && bHasNotif) return 1;
+        if (aHasNotif && bHasNotif) {
+          // Both have notifications - sort by oldest first
+          return getNotificationPriority(a.id) - getNotificationPriority(b.id);
+        }
+        return 0; // Keep original order for notes without notifications
+      });
+      
+      topLevelNotes.forEach(note => {
+        const html = renderNoteItem(note, 0);
+        
+        if (note.type === 'dm') {
+          sharedList.innerHTML += html;
+        } else {
+          notesList.innerHTML += html;
+        }
+      });
+    }
+    
+    function renderNoteItem(note, depth) {
+      const nestedClass = depth === 1 ? 'nested' : depth >= 2 ? 'nested-2' : '';
+      const activeClass = note.id === currentNoteId ? 'active' : '';
+      
+      // For DMs, color the name based on the other user's type
+      let nameColorClass = '';
+      if (note.type === 'dm') {
+        const otherUser = chatUsers.find(u => u.name === note.name);
+        if (otherUser) {
+          nameColorClass = otherUser.type;
+        }
+      }
+      
+      // Notification dot logic:
+      // - Show if THIS note has a notification
+      // - Show if this is TOP-LEVEL (depth 0) and any descendant has notification
+      // - DON'T show on intermediate folders
+      const thisNoteHasNotif = noteNotifications[note.id];
+      const isTopLevel = depth === 0;
+      const descendantHasNotif = hasDescendantNotification(note.id);
+      const showNotif = thisNoteHasNotif || (isTopLevel && descendantHasNotif);
+      const notifClass = showNotif ? 'has-notification' : '';
+      
+      // Check if note has children
+      const hasChildren = note.children && note.children.length > 0;
+      const isExpanded = expandedNotes[note.id];
+      
+      // Arrow for expandable notes
+      let arrowHtml = '';
+      if (hasChildren) {
+        const arrowChar = isExpanded ? '▼' : '▶';
+        arrowHtml = `<span class="note-expand-arrow" onclick="event.stopPropagation(); toggleNoteExpand('${note.id}')">${arrowChar}</span>`;
+      } else {
+        arrowHtml = `<span class="note-expand-arrow-spacer"></span>`;
+      }
+      
+      let html = `
+        <div class="note-item ${nestedClass} ${activeClass} ${notifClass}" data-note-id="${note.id}" onclick="openNote('${note.id}')" oncontextmenu="showNoteContextMenu(event, '${note.id}')">
+          ${arrowHtml}
+          <span class="note-item-name ${nameColorClass}">${note.name}</span>
+          <span class="note-item-notification"></span>
+        </div>
+      `;
+      
+      // Render children only if expanded
+      if (hasChildren && isExpanded) {
+        note.children.forEach(childId => {
+          const child = notes[childId];
+          if (child) {
+            html += renderNoteItem(child, depth + 1);
+          }
+        });
+      }
+      
+      return html;
+    }
+    
+    // Check if any descendants (not self) have notifications
+    function hasDescendantNotification(noteId) {
+      const note = notes[noteId];
+      if (!note || !note.children) return false;
+      
+      for (const childId of note.children) {
+        if (noteNotifications[childId]) return true;
+        if (hasDescendantNotification(childId)) return true;
+      }
+      return false;
+    }
+    
+    function toggleNoteExpand(noteId) {
+      expandedNotes[noteId] = !expandedNotes[noteId];
+      renderNotesList();
+    }
+    
+    // Context menu for notes
+    function showNoteContextMenu(event, noteId) {
+      event.preventDefault();
+      
+      const note = notes[noteId];
+      if (!note || note.isSpecial) return;
+      
+      // Remove any existing context menu
+      const existing = document.getElementById('noteContextMenu');
+      if (existing) existing.remove();
+      
+      const menu = document.createElement('div');
+      menu.id = 'noteContextMenu';
+      menu.className = 'context-menu';
+      menu.innerHTML = `
+        <div class="context-menu-item" onclick="setNoteVisibility('${noteId}', 'public')">
+          <span class="context-radio ${note.visibility === 'public' ? 'selected' : ''}"></span> Public
+        </div>
+        <div class="context-menu-item" onclick="setNoteVisibility('${noteId}', 'private')">
+          <span class="context-radio ${note.visibility === 'private' || !note.visibility ? 'selected' : ''}"></span> Private
+        </div>
+        <div class="context-menu-item" onclick="setNoteVisibility('${noteId}', 'secret')">
+          <span class="context-radio ${note.visibility === 'secret' ? 'selected' : ''}"></span> Secret
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="setNoteWritable('${noteId}', true)">
+          <span class="context-radio ${note.writable !== false ? 'selected' : ''}"></span> Write
+        </div>
+        <div class="context-menu-item" onclick="setNoteWritable('${noteId}', false)">
+          <span class="context-radio ${note.writable === false ? 'selected' : ''}"></span> Read Only
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="createNewNote('${noteId}')">+ Child</div>
+        <div class="context-menu-item" onclick="duplicateNote('${noteId}')">Duplicate</div>
+        <div class="context-menu-item" onclick="renameNote('${noteId}')">Rename</div>
+        <div class="context-menu-item danger" onclick="deleteNote('${noteId}')">Delete</div>
+      `;
+      
+      menu.style.left = event.pageX + 'px';
+      menu.style.top = event.pageY + 'px';
+      
+      document.body.appendChild(menu);
+      
+      // Close on click outside
+      setTimeout(() => {
+        document.addEventListener('click', closeContextMenu);
+      }, 0);
+    }
+    
+    function closeContextMenu() {
+      const menu = document.getElementById('noteContextMenu');
+      if (menu) menu.remove();
+      document.removeEventListener('click', closeContextMenu);
+    }
+    
+    function setNoteVisibility(noteId, visibility) {
+      const note = notes[noteId];
+      if (note) {
+        note.visibility = visibility;
+      }
+      closeContextMenu();
+    }
+    
+    function setNoteWritable(noteId, writable) {
+      const note = notes[noteId];
+      if (note) {
+        note.writable = writable;
+      }
+      closeContextMenu();
+    }
+    
+    function renameNote(noteId) {
+      closeContextMenu();
+      const note = notes[noteId];
+      if (!note) return;
+      
+      const newName = prompt('Enter new name:', note.name);
+      if (newName && newName.trim()) {
+        note.name = newName.trim();
+        renderNotesList();
+        
+        if (currentNoteId === noteId) {
+          document.getElementById('currentNoteName').textContent = note.name;
+        }
+        
+        socket.emit('renameNote', { noteId: noteId, name: note.name });
+      }
+    }
+    
+    function duplicateNote(noteId) {
+      closeContextMenu();
+      const note = notes[noteId];
+      if (!note || note.isSpecial) return;
+      
+      // Count existing top-level notebooks for naming
+      const topLevelNotebooks = Object.values(notes).filter(n => 
+        !n.isSpecial && !n.parent && n.type === 'notebook'
+      );
+      const newName = `Note ${topLevelNotebooks.length + 1}`;
+      
+      // Tell server to duplicate - server assigns ID
+      socket.emit('duplicateNote', { 
+        sourceNoteId: noteId, 
+        newName: newName
+      });
+      
+      // Note will be added to local state when server responds with 'noteCreated'
+    }
+    
+    function deleteNote(noteId) {
+      closeContextMenu();
+      const note = notes[noteId];
+      if (!note || note.isSpecial) return;
+      
+      if (!confirm('Delete "' + note.name + '"?')) return;
+      
+      // Remove from parent's children
+      if (note.parent && notes[note.parent]) {
+        const idx = notes[note.parent].children.indexOf(noteId);
+        if (idx > -1) notes[note.parent].children.splice(idx, 1);
+      }
+      
+      // Delete note and all children recursively
+      deleteNoteRecursive(noteId);
+      
+      renderNotesList();
+      
+      // If we deleted the current note, go to Cover
+      if (currentNoteId === noteId) {
+        openNote('cover');
+      }
+      
+      socket.emit('deleteNote', { noteId: noteId });
+    }
+    
+    function deleteNoteRecursive(noteId) {
+      const note = notes[noteId];
+      if (!note) return;
+      
+      // Delete children first
+      if (note.children) {
+        note.children.forEach(childId => deleteNoteRecursive(childId));
+      }
+      
+      delete notes[noteId];
+    }
+    
+    // ============================================
+    // INVITE SYSTEM
+    // ============================================
+    
+    let selectedInvites = []; // Track selected users for multi-invite
+    
+    function openInviteModal() {
+      const note = notes[currentNoteId];
+      
+      // Can't invite to Cover
+      if (!note || note.isSpecial) {
+        alert('Create a new note first to invite someone');
+        return;
+      }
+      
+      selectedInvites = [];
+      
+      const listEl = document.getElementById('inviteUsersList');
+      const emptyEl = document.getElementById('inviteEmpty');
+      const confirmBtn = document.getElementById('inviteConfirmBtn');
+      
+      // Get current user
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      
+      // Filter out self, already invited users, and agents
+      const availableUsers = chatUsers.filter(u => {
+        if (u.name === myName) return false;
+        if (u.type === 'agent') return false; // Agents don't get invited this way
+        if (note.users && note.users.includes(u.name)) return false;
+        return true;
+      });
+      
+      if (availableUsers.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.classList.add('show');
+        confirmBtn.style.display = 'none';
+      } else {
+        emptyEl.classList.remove('show');
+        confirmBtn.style.display = 'none';
+        listEl.innerHTML = availableUsers.map(u => `
+          <div class="invite-user-item" onclick="toggleInviteUser('${u.name}', '${u.type}', this)">
+            <span class="invite-checkbox"></span>
+            <span class="invite-user-name ${u.type}">${u.name}</span>
+          </div>
+        `).join('');
+      }
+      
+      document.getElementById('inviteModal').classList.add('open');
+    }
+    
+    function toggleInviteUser(userName, userType, element) {
+      const checkbox = element.querySelector('.invite-checkbox');
+      const idx = selectedInvites.findIndex(u => u.name === userName);
+      
+      if (idx > -1) {
+        // Deselect
+        selectedInvites.splice(idx, 1);
+        element.classList.remove('selected');
+        checkbox.classList.remove('checked');
+        checkbox.textContent = '';
+      } else {
+        // Select
+        selectedInvites.push({ name: userName, type: userType });
+        element.classList.add('selected');
+        checkbox.classList.add('checked');
+        checkbox.textContent = '✓';
+      }
+      
+      // Show/hide confirm button
+      const confirmBtn = document.getElementById('inviteConfirmBtn');
+      if (selectedInvites.length > 0) {
+        confirmBtn.style.display = 'block';
+        confirmBtn.textContent = selectedInvites.length === 1 ? 'INVITE' : `INVITE (${selectedInvites.length})`;
+      } else {
+        confirmBtn.style.display = 'none';
+      }
+    }
+    
+    function inviteSelectedUsers() {
+      if (selectedInvites.length === 0) return;
+      
+      const note = notes[currentNoteId];
+      if (!note || note.isSpecial) return;
+      
+      const userNames = selectedInvites.map(u => u.name);
+      
+      // Send batch invite to server
+      socket.emit('inviteMultiple', {
+        noteId: currentNoteId,
+        userNames: userNames
+      });
+      
+      closeInviteModal();
+    }
+    
+    function closeInviteModal() {
+      document.getElementById('inviteModal').classList.remove('open');
+      selectedInvites = [];
+    }
+    
+    // Find existing shared note with a user
+    function findExistingDM(userName) {
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      
+      for (const [id, note] of Object.entries(notes)) {
+        // Only match top-level shared notes (no parent)
+        if (note.type === 'dm' && !note.isSpecial && !note.parent) {
+          // Check if this note is between me and userName
+          const noteUsers = note.users || [];
+          if (noteUsers.includes(myName) && noteUsers.includes(userName)) {
+            return note;
+          }
+        }
+      }
+      return null;
+    }
+    
+    // Count non-agent users in note
+    function countRealUsers(note) {
+      if (!note.users) return 0;
+      return note.users.filter(userName => {
+        const user = chatUsers.find(u => u.name === userName);
+        return !user || user.type !== 'agent';
+      }).length;
+    }
+    
+    function doInvite(userName, targetNoteId = null) {
+      const noteId = targetNoteId || currentNoteId;
+      const note = notes[noteId];
+      if (!note) return;
+      
+      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      
+      // Check if this is a notebook being shared (not already shared)
+      if (note.type === 'notebook' && !note.isSpecial) {
+        // Find existing shared note with this person
+        let dm = findExistingDM(userName);
+        
+        if (!dm) {
+          // NO existing shared note - this note BECOMES shared
+          // Remove from old parent if any
+          if (note.parent && notes[note.parent]) {
+            const idx = notes[note.parent].children.indexOf(noteId);
+            if (idx > -1) notes[note.parent].children.splice(idx, 1);
+          }
+          
+          // Transform note into shared note
+          note.type = 'dm';
+          note.name = userName; // Will be other person's name for me
+          note.parent = null;
+          if (!note.users) note.users = [];
+          if (!note.users.includes(myName)) note.users.push(myName);
+          if (!note.users.includes(userName)) note.users.push(userName);
+          
+          // Tell server
+          socket.emit('convertNoteToDM', { 
+            noteId: noteId, 
+            userName: userName
+          });
+          
+          renderNotesList();
+          
+          // Update header if viewing this note
+          if (currentNoteId === noteId) {
+            document.getElementById('currentNoteName').textContent = userName;
+          }
+          
+          // Expand shared section
+          if (!expandedSections.shared) {
+            toggleSection('shared');
+          }
+        } else {
+          // EXISTING shared note - nest this note under it
+          // Remove note from its current parent's children
+          if (note.parent && notes[note.parent]) {
+            const idx = notes[note.parent].children.indexOf(noteId);
+            if (idx > -1) notes[note.parent].children.splice(idx, 1);
+          }
+          
+          // Move note under the shared note
+          note.parent = dm.id;
+          if (!dm.children) dm.children = [];
+          if (!dm.children.includes(noteId)) {
+            dm.children.push(noteId);
+          }
+          
+          // Add users to the note
+          if (!note.users) note.users = [];
+          if (!note.users.includes(myName)) note.users.push(myName);
+          if (!note.users.includes(userName)) note.users.push(userName);
+          
+          // Tell server about the share (move under shared note)
+          socket.emit('shareNoteWithUser', { 
+            noteId: noteId, 
+            userName: userName,
+            dmId: dm.id
+          });
+          
+          renderNotesList();
+          
+          // Expand shared section
+          if (!expandedSections.shared) {
+            toggleSection('shared');
+          }
+        }
+        return;
+      }
+      
+      // Adding to an existing shared note - just add user
+      if (!note.users) {
+        note.users = [];
+      }
+      
+      if (!note.users.includes(myName)) {
+        note.users.push(myName);
+      }
+      
+      if (!note.users.includes(userName)) {
+        note.users.push(userName);
+      }
+      
+      // Update name based on user count
+      const realUserCount = countRealUsers(note);
+      const otherMembers = note.users.filter(u => u !== myName);
+      
+      if (realUserCount === 2) {
+        // 2 people - show other person's name
+        note.name = otherMembers[0] || userName;
+      } else if (realUserCount > 2) {
+        // 3+ people - show comma list
+        note.name = otherMembers.slice(0, 3).join(', ') + (otherMembers.length > 3 ? '...' : '');
+      }
+      
+      document.getElementById('currentNoteName').textContent = note.name;
+      
+      // Tell server
+      socket.emit('inviteToNote', { 
+        noteId: noteId, 
+        userName: userName 
+      });
+      
+      renderNotesList();
+    }
+    
+    // Handle receiving invite notification
+    socket.on('noteInvite', (data) => {
+      console.log('Received note invite:', data);
+      const { note, fromUser } = data;
+      
+      // For shared notes, the name should be the OTHER person's name (the sender)
+      // unless it's 3+ people, in which case use the name as sent
+      if (note.type === 'dm' && note.users && note.users.length === 2) {
+        note.name = fromUser;
+      }
+      
+      notes[note.id] = note;
+      
+      // Add notification for new invite
+      addNotification(note.id);
+      
+      renderNotesList();
+      
+      // Auto-expand shared section
+      if (note.type === 'dm' && !expandedSections.shared) {
+        toggleSection('shared');
+      }
+    });
+    
+    // Handle note type change (when someone else is invited)
+    socket.on('noteTypeChanged', (data) => {
+      const { noteId, type, name, users } = data;
+      if (notes[noteId]) {
+        notes[noteId].type = type;
+        notes[noteId].users = users;
+        
+        // Update name - for 2 people, keep showing other person's name
+        // for 3+, use the comma list name sent from server
+        const session = JSON.parse(localStorage.getItem('grimoire_session'));
+        const myName = session ? session.name : '';
+        
+        if (users && users.length === 2) {
+          // Keep showing other person's name
+          const otherPerson = users.find(u => u !== myName);
+          if (otherPerson) notes[noteId].name = otherPerson;
+        } else if (users && users.length > 2) {
+          // Use comma list of others
+          const otherMembers = users.filter(u => u !== myName);
+          notes[noteId].name = otherMembers.slice(0, 3).join(', ') + (otherMembers.length > 3 ? '...' : '');
+        }
+        
+        renderNotesList();
+        
+        if (currentNoteId === noteId) {
+          document.getElementById('currentNoteName').textContent = notes[noteId].name;
+        }
+      }
+    });
+    
+    // Handle note being shared (moved under shared note)
+    socket.on('noteShared', (data) => {
+      console.log('Note shared:', data);
+      const { note, dm, fromUser } = data;
+      
+      // Add/update the shared note parent
+      notes[dm.id] = dm;
+      
+      // Add/update the nested note
+      notes[note.id] = note;
+      
+      renderNotesList();
+      
+      // Expand shared section
+      if (!expandedSections.shared) {
+        toggleSection('shared');
+      }
+    });
+    
+    // Handle batch invite result (for inviter)
+    socket.on('inviteMultipleResult', (data) => {
+      console.log('Invite multiple result:', data);
+      const { note } = data;
+      
+      // Update local note state
+      notes[note.id] = note;
+      
+      renderNotesList();
+      
+      // Update header if viewing this note
+      if (currentNoteId === note.id) {
+        document.getElementById('currentNoteName').textContent = note.name;
+      }
+      
+      // Expand shared section
+      if (note.type === 'dm' && !expandedSections.shared) {
+        toggleSection('shared');
+      }
+    });
+    
+    // Initialize Cover as active and agents expanded on load
+    document.getElementById('coverNote').classList.add('active');
+    initSections();
+  </script>
+</body>
+</html>
