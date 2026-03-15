@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GRIMOIRE</title>
   <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="/urbit-ob-browser.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
     
@@ -196,6 +198,46 @@
     
     .login-buttons.hidden {
       display: none;
+    }
+    
+    /* Azimuth section */
+    .azimuth-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .azimuth-points {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .azimuth-point-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      padding: 0.75rem 1rem;
+      background: transparent;
+      border: 2px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .azimuth-point-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+    }
+    
+    .azimuth-status {
+      font-size: 0.9rem;
+      color: #666;
+      text-align: center;
+    }
+    
+    .azimuth-status.error {
+      color: #ff4444;
     }
     
     .back-btn {
@@ -529,7 +571,7 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--amber);
+      background: var(--green);
       margin-left: auto;
       display: none;
     }
@@ -935,10 +977,86 @@
       color: #999;
     }
     
+    /* Wallet connect section */
+    .wallet-connect-section {
+      padding: 2rem 1rem;
+      text-align: center;
+    }
+    
+    .wallet-connect-message {
+      color: #888;
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+    
+    .wallet-connect-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.75rem 1.5rem;
+      background: transparent;
+      border: 2px solid var(--amber);
+      color: var(--amber);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .wallet-connect-btn:hover {
+      background: rgba(255, 170, 0, 0.15);
+    }
+    
+    .wallet-connect-status {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+    
+    .wallet-connect-status.error {
+      color: #ff4444;
+    }
+    
+    /* Wallet address display */
+    .wallet-address {
+      padding: 1rem;
+      border-bottom: 1px solid #222;
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    
+    .wallet-address:hover {
+      background: rgba(255, 170, 0, 0.05);
+    }
+    
+    .wallet-address-label {
+      display: block;
+      font-size: 0.75rem;
+      color: #555;
+      margin-bottom: 0.25rem;
+    }
+    
+    .wallet-address-value {
+      font-size: 0.8rem;
+      color: #888;
+      word-break: break-all;
+    }
+    
+    .wallet-address-full {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--amber);
+      word-break: break-all;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #111;
+      border: 1px solid #333;
+    }
+    
     .wallet-balance {
       padding: 1.5rem 1rem;
       text-align: center;
       border-bottom: 1px solid #222;
+      position: relative;
     }
     
     .wallet-balance-label {
@@ -951,6 +1069,25 @@
     .wallet-balance-amount {
       font-size: 1.8rem;
       color: var(--green);
+    }
+    
+    .wallet-refresh-btn {
+      position: absolute;
+      right: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: 1px solid #333;
+      color: #555;
+      font-size: 1rem;
+      padding: 0.25rem 0.5rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .wallet-refresh-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
     }
     
     .wallet-actions {
@@ -1408,6 +1545,42 @@
       color: var(--blue);
     }
     
+    /* URL Embeds */
+    .url-embed {
+      margin-top: 0.5rem;
+      text-indent: 0;
+    }
+    
+    .url-embed.youtube-embed {
+      max-width: 400px;
+    }
+    
+    .url-embed.youtube-embed iframe {
+      border: 1px solid #2a2a2a;
+      display: block;
+    }
+    
+    .url-embed.image-embed img {
+      max-width: 400px;
+      max-height: 300px;
+      border: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    
+    .url-embed.image-embed img:hover {
+      border-color: var(--amber);
+    }
+    
+    .url-link {
+      color: var(--blue);
+      text-decoration: none;
+    }
+    
+    .url-link:hover {
+      text-decoration: underline;
+    }
+    
     /* Reply indicator above input */
     .reply-indicator {
       display: none;
@@ -1612,6 +1785,393 @@
     
     .artifact-preview-markdown:hover {
       border-color: #444;
+    }
+    
+    /* ============================================
+       INLINE ARTIFACT SYSTEM
+       ============================================ */
+    
+    .artifact-inline {
+      background: #0a0a0a;
+      border: 1px solid #2a2a2a;
+      margin-top: 0.5rem;
+      max-width: 500px;
+      position: relative;
+      text-indent: 0;
+    }
+    
+    .artifact-inline-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.4rem 0.6rem;
+      background: #111;
+      border-bottom: 1px solid #222;
+      font-size: 0.85rem;
+    }
+    
+    .artifact-inline-title {
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .artifact-inline-title .artifact-type-icon {
+      color: var(--amber);
+    }
+    
+    .artifact-inline-title .artifact-name {
+      color: #bbb;
+    }
+    
+    .artifact-inline-title .artifact-version {
+      color: #555;
+    }
+    
+    .artifact-inline-actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+    
+    .artifact-inline-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.8rem;
+      padding: 0.15rem 0.4rem;
+      background: transparent;
+      border: 1px solid #333;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .artifact-inline-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .artifact-inline-content {
+      padding: 0.75rem;
+      max-height: 300px;
+      overflow: auto;
+    }
+    
+    .artifact-inline-content pre {
+      margin: 0;
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      color: #bbb;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    
+    .artifact-inline-content img {
+      max-width: 100%;
+      max-height: 280px;
+      display: block;
+    }
+    
+    /* Simple image artifact - no box, just image + expand */
+    .artifact-image-simple {
+      position: relative;
+      display: inline-block;
+      margin-top: 0.5rem;
+      text-indent: 0;
+    }
+    
+    .artifact-image-simple img {
+      max-width: 400px;
+      max-height: 300px;
+      border: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    
+    .artifact-image-simple img:hover {
+      border-color: var(--amber);
+    }
+    
+    .artifact-image-expand {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      font-family: 'VT323', monospace;
+      font-size: 0.9rem;
+      padding: 0.2rem 0.4rem;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid #444;
+      color: #888;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    
+    .artifact-image-simple:hover .artifact-image-expand {
+      opacity: 1;
+    }
+    
+    .artifact-image-expand:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .artifact-inline-content.markdown-content {
+      color: #bbb;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    
+    .artifact-inline-content.markdown-content h1 {
+      color: var(--amber);
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .artifact-inline-content.markdown-content h2 {
+      color: var(--amber);
+      font-size: 1.1rem;
+      margin-top: 1rem;
+      margin-bottom: 0.4rem;
+    }
+    
+    /* Light Bike game artifact */
+    .artifact-inline.lightbike {
+      width: fit-content;
+      max-width: none;
+    }
+    
+    .artifact-inline.lightbike .artifact-inline-content {
+      padding: 0;
+      background: #000;
+      max-height: none;
+      overflow: visible;
+      width: fit-content;
+    }
+    
+    .lightbike-setup {
+      padding: 0.5rem;
+      background: #0a0a0a;
+      border-bottom: 1px solid #222;
+    }
+    
+    .lightbike-player-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+    
+    .lightbike-player-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .lightbike-player-label {
+      font-size: 0.85rem;
+      font-weight: bold;
+      width: 2rem;
+    }
+    
+    .lightbike-select {
+      font-family: 'VT323', monospace;
+      font-size: 0.85rem;
+      padding: 0.2rem 0.4rem;
+      background: #111;
+      border: 1px solid #333;
+      color: #ccc;
+      cursor: pointer;
+      flex: 1;
+      max-width: 180px;
+    }
+    
+    .lightbike-select:hover {
+      border-color: #555;
+    }
+    
+    .lightbike-select:focus {
+      outline: none;
+      border-color: var(--amber);
+    }
+    
+    .lightbike-player-locked {
+      font-size: 0.85rem;
+      color: var(--green);
+    }
+    
+    .lightbike-player-owner {
+      color: #555;
+      font-size: 0.75rem;
+    }
+    
+    .lightbike-canvas {
+      display: block;
+      image-rendering: pixelated;
+      width: 250px;
+      height: 250px;
+    }
+    
+    .lightbike-controls {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: #111;
+      border-top: 1px solid #222;
+    }
+    
+    .lightbike-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.6rem;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .lightbike-btn:hover:not(.disabled) {
+      background: rgba(0, 255, 136, 0.15);
+    }
+    
+    .lightbike-btn.disabled {
+      border-color: #333;
+      color: #444;
+      cursor: not-allowed;
+    }
+    
+    .lightbike-status {
+      color: #666;
+      font-size: 0.85rem;
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+    }
+    
+    /* ============================================
+       FULLSCREEN ARTIFACT OVERLAY
+       ============================================ */
+    
+    .artifact-fullscreen-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 2500;
+      flex-direction: column;
+    }
+    
+    .artifact-fullscreen-overlay.open {
+      display: flex;
+    }
+    
+    .artifact-fullscreen-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: #0d0d0d;
+      border-bottom: 1px solid #333;
+    }
+    
+    .artifact-fullscreen-title {
+      color: var(--amber);
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .artifact-fullscreen-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .artifact-fullscreen-btn {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      padding: 0.4rem 0.75rem;
+      background: transparent;
+      border: 1px solid #555;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .artifact-fullscreen-btn:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    
+    .artifact-fullscreen-btn.close-btn:hover {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+    
+    .artifact-fullscreen-content {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .artifact-fullscreen-content pre {
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      color: #bbb;
+      white-space: pre-wrap;
+      max-width: 900px;
+      width: 100%;
+    }
+    
+    .artifact-fullscreen-content img {
+      max-width: 95%;
+      max-height: 85vh;
+    }
+    
+    .artifact-fullscreen-content.markdown-content {
+      display: block;
+      max-width: 800px;
+      margin: 0 auto;
+      color: #bbb;
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+    
+    .artifact-fullscreen-content .lightbike-game-container,
+    .lightbike-game-container-fullscreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .lightbike-setup-fullscreen {
+      padding: 1rem;
+      background: #0a0a0a;
+      border: 1px solid #222;
+      margin-bottom: 1rem;
+      min-width: 300px;
+    }
+    
+    .lightbike-setup-fullscreen .lightbike-player-row {
+      margin-bottom: 0.5rem;
+    }
+    
+    .lightbike-setup-fullscreen .lightbike-select {
+      font-size: 1rem;
+      padding: 0.3rem 0.5rem;
+    }
+    
+    .lightbike-setup-fullscreen .lightbike-player-locked {
+      font-size: 1rem;
+    }
+    
+    .artifact-fullscreen-content .lightbike-canvas {
+      width: 600px;
+      height: 600px;
     }
     
     /* Image Lightbox */
@@ -2023,7 +2583,7 @@
       <p class="section-label">LOG IN</p>
       
       <div class="login-buttons" id="loginButtons">
-        <button class="login-btn urbit" onclick="selectLoginType('urbit')">
+        <button class="login-btn urbit" onclick="connectAzimuth()">
           URBIT ID
         </button>
         <button class="login-btn visitor" onclick="selectLoginType('visitor')">
@@ -2032,6 +2592,14 @@
         <button class="login-btn agent" onclick="selectLoginType('agent')">
           AGENT LOGIN
         </button>
+      </div>
+      
+      <!-- Azimuth point selection (hidden by default) -->
+      <div class="azimuth-section" id="azimuthSection" style="display: none;">
+        <button class="back-btn" onclick="goBackFromAzimuth()">← BACK</button>
+        <p class="name-prompt">SELECT YOUR PLANET</p>
+        <div class="azimuth-points" id="azimuthPoints"></div>
+        <p class="azimuth-status" id="azimuthStatus"></p>
       </div>
       
       <div class="name-section" id="nameSection">
@@ -2148,9 +2716,9 @@
             <div class="chat-input-actions">
               <button class="chat-action-btn" title="Attach" onclick="toggleArtifactMenu()">+</button>
               <div class="artifact-menu" id="artifactMenu">
-                <button class="artifact-menu-item" onclick="openArtifactModal('markdown')">¶ Markdown</button>
                 <button class="artifact-menu-item" onclick="openArtifactModal('code')">{ } Code</button>
                 <button class="artifact-menu-item" onclick="openArtifactModal('image')">▢ Image</button>
+                <button class="artifact-menu-item" onclick="openArtifactModal('lightbike')">╔ Light Bike</button>
               </div>
               <div class="mentions-dropdown" id="mentionsDropdown"></div>
             </div>
@@ -2192,13 +2760,15 @@
           <input type="text" class="modal-input" id="artifactNameInput" placeholder="my-artifact">
         </div>
         <div class="modal-field" id="languageField" style="display: none;">
-          <label class="modal-label">Language</label>
+          <label class="modal-label">Syntax</label>
           <select class="modal-select" id="artifactLanguage">
             <option value="javascript">JavaScript</option>
             <option value="python">Python</option>
+            <option value="markdown">Markdown</option>
             <option value="hoon">Hoon</option>
             <option value="html">HTML</option>
             <option value="css">CSS</option>
+            <option value="json">JSON</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -2214,11 +2784,36 @@
           <label class="modal-label">Image URL</label>
           <input type="text" class="modal-input" id="artifactImageUrl" placeholder="https://...">
         </div>
+        <div class="modal-field" id="lightbikeField" style="display: none;">
+          <label class="modal-label">Game Settings</label>
+          <div style="color: #666; font-size: 0.9rem; padding: 0.5rem; background: #111; border: 1px solid #222;">
+            Arena: 50×50 grid<br>
+            Speed: 5 moves/sec<br>
+            Players: You vs Agent
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="modal-cancel-btn" onclick="closeArtifactModal()">CANCEL</button>
         <button class="modal-submit-btn" onclick="submitArtifact()">CREATE</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Artifact Overlay -->
+  <div class="artifact-fullscreen-overlay" id="artifactFullscreen">
+    <div class="artifact-fullscreen-header">
+      <span class="artifact-fullscreen-title" id="fullscreenTitle">
+        <span class="artifact-type-icon">{ }</span>
+        <span>artifact-name</span>
+      </span>
+      <div class="artifact-fullscreen-actions">
+        <button class="artifact-fullscreen-btn" onclick="openArtifactSourceFromFullscreen()">SOURCE</button>
+        <button class="artifact-fullscreen-btn close-btn" onclick="closeFullscreen()">✕ CLOSE</button>
+      </div>
+    </div>
+    <div class="artifact-fullscreen-content" id="fullscreenContent">
+      <!-- Fullscreen content loads here -->
     </div>
   </div>
 
@@ -2234,19 +2829,21 @@
         <span class="wallet-title">WALLET</span>
         <button class="wallet-close-btn" onclick="closeWallet()">✕</button>
       </div>
-      <div class="wallet-balance">
-        <span class="wallet-balance-label">Balance</span>
-        <span class="wallet-balance-amount" id="walletBalance">100,000.00 $NOCK</span>
-      </div>
-      <div class="wallet-actions">
-        <button class="wallet-action-btn" onclick="openSendModal()">SEND</button>
-        <button class="wallet-action-btn" onclick="openRequestModal()">REQUEST</button>
-        <button class="wallet-action-btn" onclick="openContractsModal()">CONTRACTS</button>
-      </div>
-      <div class="wallet-transactions">
-        <div class="wallet-transactions-title">Transactions</div>
-        <div class="wallet-transactions-list" id="walletTransactions">
-          <div class="wallet-empty">No transactions yet</div>
+      
+      <div class="wallet-connected-section" id="walletConnectedSection">
+        <div class="wallet-balance">
+          <span class="wallet-balance-label">Balance</span>
+          <span class="wallet-balance-amount" id="walletBalance">0.00 $NOCK</span>
+        </div>
+        <div class="wallet-actions">
+          <button class="wallet-action-btn" onclick="openSendModal()">SEND</button>
+          <button class="wallet-action-btn" onclick="openRequestModal()">REQUEST</button>
+        </div>
+        <div class="wallet-transactions">
+          <div class="wallet-transactions-title">Transactions</div>
+          <div class="wallet-transactions-list" id="walletTransactions">
+            <div class="wallet-empty">No transactions yet</div>
+          </div>
         </div>
       </div>
     </div>
@@ -2261,12 +2858,12 @@
       </div>
       <div class="wallet-modal-body">
         <div class="wallet-modal-field">
-          <label>To</label>
-          <input type="text" id="sendTo" placeholder="recipient name">
+          <label>To (username)</label>
+          <input type="text" id="sendTo" placeholder="username">
         </div>
         <div class="wallet-modal-field">
           <label>Amount</label>
-          <input type="number" id="sendAmount" placeholder="0.00">
+          <input type="number" id="sendAmount" placeholder="0.00" step="0.01">
         </div>
       </div>
       <div class="wallet-modal-footer">
@@ -2374,11 +2971,25 @@
     
     // Check for existing session
     window.onload = function() {
-      const session = localStorage.getItem('grimoire_session');
+      const session = sessionStorage.getItem('grimoire_session');
       if (session) {
-        const { type, name } = JSON.parse(session);
-        showApp(type, name);
+        const { type, name, ethAddress } = JSON.parse(session);
+        // Restore ETH address if present
+        if (ethAddress) {
+          connectedEthAddress = ethAddress;
+        }
+        // Set as pending and request join - server will confirm
+        pendingLogin = { type, name, ethAddress };
+        socket.emit('join', { name, type });
+        
+        // Re-register ETH address with server
+        if (ethAddress) {
+          socket.emit('registerWalletAddress', { address: ethAddress });
+        }
       }
+      
+      // Initialize wallet state
+      initWallet();
     };
     
     function selectLoginType(type) {
@@ -2424,6 +3035,118 @@
       document.getElementById('nameSection').classList.remove('active');
     }
     
+    function goBackFromAzimuth() {
+      document.getElementById('loginButtons').classList.remove('hidden');
+      document.getElementById('azimuthSection').style.display = 'none';
+    }
+    
+    // Azimuth contract address and ABI (minimal for getOwnedPoints)
+    const AZIMUTH_ADDRESS = '0x223c067f8cf28ae173ee5cafea60ca44c335fecb';
+    const AZIMUTH_ABI = [
+      'function getOwnedPoints(address _whose) view returns (uint32[])'
+    ];
+    
+    // Use urbit-ob library for proper patp conversion
+    // The library is loaded via local bundle and exposes 'urbitOb' globally
+    function patp(num) {
+      if (typeof window.urbitOb !== 'undefined' && window.urbitOb.patp) {
+        return window.urbitOb.patp(num);
+      }
+      // Fallback if library didn't load
+      console.warn('urbit-ob not loaded, using fallback');
+      return '~point-' + num;
+    }
+    
+    let connectedEthAddress = null;
+    
+    async function connectAzimuth() {
+      const statusEl = document.getElementById('azimuthStatus');
+      const pointsEl = document.getElementById('azimuthPoints');
+      
+      // Check for MetaMask
+      if (typeof window.ethereum === 'undefined') {
+        alert('MetaMask not detected. Please install MetaMask to login with Urbit ID.');
+        return;
+      }
+      
+      // Show Azimuth section
+      document.getElementById('loginButtons').classList.add('hidden');
+      document.getElementById('azimuthSection').style.display = 'flex';
+      statusEl.textContent = 'Connecting to MetaMask...';
+      statusEl.className = 'azimuth-status';
+      pointsEl.innerHTML = '';
+      
+      try {
+        // First, switch MetaMask to Ethereum mainnet for Azimuth lookup
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x1' }] // Ethereum mainnet
+          });
+        } catch (switchErr) {
+          // If they don't have mainnet (unlikely), continue anyway
+          console.log('Could not switch to mainnet:', switchErr.message);
+        }
+        
+        // Request account access from MetaMask (now on mainnet)
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);
+        const signer = provider.getSigner();
+        const address = await signer.getAddress();
+        
+        // Store ETH address for wallet transfers
+        connectedEthAddress = address;
+        
+        statusEl.textContent = 'Checking Azimuth for your planets...';
+        
+        // Query Azimuth contract using MetaMask's provider (now on mainnet)
+        const azimuth = new ethers.Contract(AZIMUTH_ADDRESS, AZIMUTH_ABI, provider);
+        const points = await azimuth.getOwnedPoints(address);
+        
+        if (points.length === 0) {
+          statusEl.textContent = 'No Urbit points found for this address. Note: L2 planets are not supported yet.';
+          statusEl.className = 'azimuth-status error';
+          return;
+        }
+        
+        statusEl.textContent = `Found ${points.length} point(s). Select one to login:`;
+        
+        // Display points as buttons
+        points.forEach(point => {
+          const pointNum = point.toNumber ? point.toNumber() : Number(point);
+          const name = patp(pointNum);
+          
+          const btn = document.createElement('button');
+          btn.className = 'azimuth-point-btn';
+          btn.textContent = name;
+          btn.onclick = () => loginWithAzimuth(name, address);
+          pointsEl.appendChild(btn);
+        });
+        
+      } catch (err) {
+        console.error('Azimuth error:', err);
+        if (err.code === 4001) {
+          statusEl.textContent = 'Connection cancelled.';
+        } else {
+          statusEl.textContent = 'Error: ' + (err.message || 'Unknown error');
+        }
+        statusEl.className = 'azimuth-status error';
+      }
+    }
+    
+    function loginWithAzimuth(name, ethAddress) {
+      // Store pending login info (don't save to localStorage until confirmed)
+      pendingLogin = { type: 'urbit', name: name, ethAddress: ethAddress };
+      
+      // Request to join - server will confirm or reject
+      socket.emit('join', { name, type: 'urbit' });
+      
+      // Register ETH address for wallet lookups
+      if (ethAddress) {
+        socket.emit('registerWalletAddress', { address: ethAddress });
+      }
+    }
+    
     function validateName() {
       const input = document.getElementById('nameInput');
       const btn = document.getElementById('enterBtn');
@@ -2439,18 +3162,19 @@
       }
     }
     
+    // Pending login info (set before join, confirmed on init)
+    let pendingLogin = null;
+    
     function enterGrimoire() {
       const input = document.getElementById('nameInput');
       const prefix = document.getElementById('namePrefix').textContent;
       const name = prefix + input.value.trim();
       
-      // Save to localStorage
-      localStorage.setItem('grimoire_session', JSON.stringify({
-        type: selectedType,
-        name: name
-      }));
+      // Store pending login info (don't save to localStorage until confirmed)
+      pendingLogin = { type: selectedType, name: name };
       
-      showApp(selectedType, name);
+      // Request to join - server will confirm or reject
+      socket.emit('join', { name, type: selectedType });
     }
     
     function showApp(type, name) {
@@ -2460,13 +3184,10 @@
       const displayName = document.getElementById('displayName');
       displayName.textContent = name;
       displayName.className = 'user-name ' + type;
-      
-      // Join the socket room
-      socket.emit('join', { name, type });
     }
     
     function logout() {
-      localStorage.removeItem('grimoire_session');
+      sessionStorage.removeItem('grimoire_session');
       location.reload();
     }
     
@@ -2477,8 +3198,44 @@
     // SOCKET EVENT HANDLERS
     // ============================================
     
+    socket.on('joinError', (data) => {
+      console.log('Join error:', data.message);
+      alert(data.message);
+      
+      // Clear pending login
+      pendingLogin = null;
+      selectedType = null;
+      
+      // Clear any saved session that might be invalid
+      sessionStorage.removeItem('grimoire_session');
+      
+      // Reset UI to initial login state
+      document.getElementById('loginScreen').style.display = '';  // Reset to CSS default
+      document.getElementById('appContainer').classList.remove('active');
+      document.getElementById('loginButtons').classList.remove('hidden');
+      document.getElementById('nameSection').classList.remove('active');
+      document.getElementById('azimuthSection').style.display = 'none';
+      
+      // Clear name input
+      const nameInput = document.getElementById('nameInput');
+      if (nameInput) {
+        nameInput.value = '';
+      }
+      const enterBtn = document.getElementById('enterBtn');
+      if (enterBtn) {
+        enterBtn.disabled = true;
+      }
+    });
+    
     socket.on('init', (data) => {
       console.log('Received init:', data);
+      
+      // Login confirmed - now save to localStorage and show app
+      if (pendingLogin) {
+        sessionStorage.setItem('grimoire_session', JSON.stringify(pendingLogin));
+        showApp(pendingLogin.type, pendingLogin.name);
+        pendingLogin = null;
+      }
       
       // Load notes from server
       if (data.notes) {
@@ -2556,7 +3313,7 @@
       const note = data.note || data; // Handle both {note} wrapper and bare note
       console.log('Note created:', note);
       
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       const isCreator = session && note.creator === session.name;
       
       // Add to local state
@@ -2700,25 +3457,9 @@
       if (msg.artifactId) {
         const artifact = artifacts[msg.artifactId];
         if (artifact) {
-          const version = msg.artifactVersion || artifact.versions.length;
-          const versionData = artifact.versions[version - 1];
-          const content = versionData ? versionData.content : '';
-          
-          let previewHtml = '';
-          if (artifact.type === 'image') {
-            previewHtml = `<img class="artifact-preview-image" src="${content}" onclick="openLightbox('${content}')" onerror="this.style.display='none'">`;
-          } else if (artifact.type !== 'markdown') {
-            const preview = content.substring(0, 200) + (content.length > 200 ? '...' : '');
-            previewHtml = `<div class="artifact-preview-code" onclick="openArtifact('${msg.artifactId}', ${version})">${escapeHtml(preview)}</div>`;
-          } else {
-            const preview = content.substring(0, 150) + (content.length > 150 ? '...' : '');
-            previewHtml = `<div class="artifact-preview-markdown" onclick="openArtifact('${msg.artifactId}', ${version})">${escapeHtml(preview)}</div>`;
-          }
-          
-          bodyContent = `
-            <div style="color: #888; font-size: 0.9rem; margin-bottom: 0.25rem;">${artifact.name} <span style="color: #555;">• v${version}</span></div>
-            ${previewHtml}
-          `;
+          const version = msg.artifactVersion || (artifact.versions ? artifact.versions.length : 1);
+          // Render inline artifact
+          bodyContent = renderInlineArtifact(artifact, version);
         } else {
           bodyContent = parseMentions(escapeHtml(msg.text));
         }
@@ -2808,6 +3549,14 @@
       
       messagesContainer.appendChild(messageDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Initialize lightbike canvas if this is a lightbike artifact
+      if (msg.artifactId) {
+        const artifact = artifacts[msg.artifactId];
+        if (artifact && artifact.type === 'lightbike') {
+          initLightBikeCanvas(msg.artifactId);
+        }
+      }
     }
     
     function addArtifactToSidebar(artifact) {
@@ -2853,7 +3602,7 @@
     
     function showMentionsDropdown(filter) {
       const dropdown = document.getElementById('mentionsDropdown');
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       
       // Add current user to chatUsers if not present
       if (!chatUsers.find(u => u.name === session.name)) {
@@ -3150,7 +3899,7 @@
     
     function parseMentions(text) {
       // Replace @username with styled mention spans
-      return text.replace(/@([~\w-]+)/g, (match, name) => {
+      let parsed = text.replace(/@([~\w-]+)/g, (match, name) => {
         // Check chatUsers first
         let user = chatUsers.find(u => u.name === name);
         if (!user) {
@@ -3163,6 +3912,43 @@
         const type = user ? user.type : 'visitor';
         return `<span class="mention ${type}">@${name}</span>`;
       });
+      
+      // Parse URLs and embeds
+      parsed = parseUrls(parsed);
+      
+      return parsed;
+    }
+    
+    function parseUrls(text) {
+      // YouTube embed
+      const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(?:[^\s]*)?/g;
+      text = text.replace(youtubeRegex, (match, videoId) => {
+        return `<div class="url-embed youtube-embed">
+          <iframe width="400" height="225" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>
+        </div>`;
+      });
+      
+      // Image URLs (common formats)
+      const imageRegex = /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?)/gi;
+      text = text.replace(imageRegex, (match, url) => {
+        // Don't double-embed if already in an embed div
+        if (text.includes('url-embed')) return match;
+        return `<div class="url-embed image-embed">
+          <img src="${url}" onclick="openLightbox('${url}')" onerror="this.parentElement.style.display='none'">
+        </div>`;
+      });
+      
+      // Regular URLs - make clickable (but not ones we already embedded)
+      const urlRegex = /(?<!src="|href=")(https?:\/\/[^\s<]+)/g;
+      text = text.replace(urlRegex, (match) => {
+        // Skip if it's a YouTube or image we already handled
+        if (match.match(/youtube\.com|youtu\.be/) || match.match(/\.(png|jpg|jpeg|gif|webp)(\?|$)/i)) {
+          return match;
+        }
+        return `<a href="${match}" target="_blank" rel="noopener" class="url-link">${match}</a>`;
+      });
+      
+      return text;
     }
     
     function replyToMessage(messageId) {
@@ -3331,31 +4117,32 @@ export { authenticateUser };`
       const contentField = document.getElementById('contentField');
       const imageField = document.getElementById('imageField');
       const imageCommentField = document.getElementById('imageCommentField');
+      const lightbikeField = document.getElementById('lightbikeField');
       
       menu.classList.remove('open');
       
+      // Hide all optional fields first
+      nameField.style.display = 'flex';
+      languageField.style.display = 'none';
+      contentField.style.display = 'flex';
+      imageField.style.display = 'none';
+      imageCommentField.style.display = 'none';
+      lightbikeField.style.display = 'none';
+      
       // Configure modal based on type
-      if (type === 'markdown') {
-        title.textContent = 'Create Markdown';
-        nameField.style.display = 'flex';
-        languageField.style.display = 'none';
-        contentField.style.display = 'flex';
-        imageField.style.display = 'none';
-        imageCommentField.style.display = 'none';
-      } else if (type === 'code') {
+      if (type === 'code') {
         title.textContent = 'Create Code';
-        nameField.style.display = 'flex';
         languageField.style.display = 'flex';
-        contentField.style.display = 'flex';
-        imageField.style.display = 'none';
-        imageCommentField.style.display = 'none';
       } else if (type === 'image') {
         title.textContent = 'Add Image';
         nameField.style.display = 'none';
-        languageField.style.display = 'none';
         contentField.style.display = 'none';
         imageField.style.display = 'flex';
         imageCommentField.style.display = 'flex';
+      } else if (type === 'lightbike') {
+        title.textContent = 'Create Light Bike Game';
+        contentField.style.display = 'none';
+        lightbikeField.style.display = 'flex';
       }
       
       // Clear inputs
@@ -3425,6 +4212,15 @@ export { authenticateUser };`
             return;
           }
           name = 'image-' + Date.now();
+        } else if (currentArtifactType === 'lightbike') {
+          // Light Bike game
+          if (!name) {
+            name = 'lightbike-' + Date.now();
+          }
+          content = JSON.stringify({
+            arena: { width: 50, height: 50 },
+            tickRate: 200
+          });
         } else {
           if (!name) {
             alert('Please enter a name');
@@ -3520,6 +4316,459 @@ export { authenticateUser };`
     
     // Track currently open artifact for editing
     let currentOpenArtifactId = null;
+    let currentFullscreenArtifactId = null;
+    
+    // ============================================
+    // INLINE ARTIFACT SYSTEM
+    // ============================================
+    
+    // Get artifact type icon
+    function getArtifactTypeIcon(type) {
+      if (type === 'image') return '▢';
+      if (type === 'lightbike') return '╔';
+      return '{ }'; // code (includes markdown now)
+    }
+    
+    // Render inline artifact in chat
+    function renderInlineArtifact(artifact, version) {
+      const versionData = artifact.versions ? artifact.versions[version - 1] : null;
+      const content = versionData ? versionData.content : (artifact.content || '');
+      const typeIcon = getArtifactTypeIcon(artifact.type);
+      
+      // Images get simple treatment - just image + expand button
+      if (artifact.type === 'image') {
+        return `
+          <div class="artifact-image-simple" data-artifact-id="${artifact.id}" data-version="${version}">
+            <img src="${escapeHtml(content)}" onclick="expandArtifact('${artifact.id}', ${version})" onerror="this.style.display='none'">
+            <button class="artifact-image-expand" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
+          </div>
+        `;
+      }
+      
+      let contentHtml = '';
+      
+      if (artifact.type === 'lightbike') {
+        contentHtml = renderLightBikeInline(artifact.id);
+      } else if (artifact.type === 'markdown') {
+        contentHtml = renderSimpleMarkdown(content);
+      } else if (artifact.type === 'html') {
+        // HTML renders in sandboxed iframe
+        contentHtml = `<iframe srcdoc="${escapeHtml(content).replace(/"/g, '&quot;')}" style="width: 100%; height: 200px; border: none; background: #fff;"></iframe>`;
+      } else {
+        // Code types
+        contentHtml = `<pre>${escapeHtml(content)}</pre>`;
+      }
+      
+      const contentClass = artifact.type === 'markdown' ? 'artifact-inline-content markdown-content' : 'artifact-inline-content';
+      
+      return `
+        <div class="artifact-inline ${artifact.type === 'lightbike' ? 'lightbike' : ''}" data-artifact-id="${artifact.id}" data-version="${version}">
+          <div class="artifact-inline-header">
+            <span class="artifact-inline-title">
+              <span class="artifact-type-icon">${typeIcon}</span>
+              <span class="artifact-name">${escapeHtml(artifact.name)}</span>
+              <span class="artifact-version">v${version}</span>
+            </span>
+            <div class="artifact-inline-actions">
+              <button class="artifact-inline-btn" onclick="openArtifactSource('${artifact.id}', ${version})" title="Source">&lt;/&gt;</button>
+              <button class="artifact-inline-btn" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
+            </div>
+          </div>
+          <div class="${contentClass}">
+            ${contentHtml}
+          </div>
+        </div>
+      `;
+    }
+    
+    // Render Light Bike game inline
+    function renderLightBikeInline(artifactId) {
+      const game = lightbikeGames[artifactId] || { player1: null, player2: null, state: 'waiting' };
+      
+      // Get current user's bots
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      const myBots = registeredAgents.filter(a => a.owner === myName);
+      
+      // Add dummy bots for testing (available to everyone)
+      const dummyBots = [
+        { name: '🤖 Random', value: 'dummy:random' },
+        { name: '🤖 Clockwise', value: 'dummy:clockwise' },
+        { name: '🤖 Survivor', value: 'dummy:survivor' }
+      ];
+      
+      // Build player 1 dropdown or locked display
+      let player1Html;
+      if (game.player1) {
+        player1Html = `<span class="lightbike-player-locked">${game.player1.bot} <span class="lightbike-player-owner">(${game.player1.owner})</span></span>`;
+      } else {
+        const myBotOptions = myBots.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+        const dummyOptions = dummyBots.map(b => `<option value="${b.value}">${b.name}</option>`).join('');
+        player1Html = `<select class="lightbike-select" id="lb-p1-${artifactId}" onchange="selectLightBikePlayer('${artifactId}', 1, this.value)">
+          <option value="">Select Bot...</option>
+          ${myBotOptions}
+          <optgroup label="Test Bots">
+            ${dummyOptions}
+          </optgroup>
+        </select>`;
+      }
+      
+      // Build player 2 dropdown or locked display
+      let player2Html;
+      if (game.player2) {
+        player2Html = `<span class="lightbike-player-locked">${game.player2.bot} <span class="lightbike-player-owner">(${game.player2.owner})</span></span>`;
+      } else {
+        const myBotOptions = myBots.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+        const dummyOptions = dummyBots.map(b => `<option value="${b.value}">${b.name}</option>`).join('');
+        player2Html = `<select class="lightbike-select" id="lb-p2-${artifactId}" onchange="selectLightBikePlayer('${artifactId}', 2, this.value)">
+          <option value="">Select Bot...</option>
+          ${myBotOptions}
+          <optgroup label="Test Bots">
+            ${dummyOptions}
+          </optgroup>
+        </select>`;
+      }
+      
+      // Start button - only enabled when both players selected
+      const canStart = game.player1 && game.player2 && game.state === 'ready';
+      const startDisabled = canStart ? '' : 'disabled';
+      const startClass = canStart ? 'lightbike-btn' : 'lightbike-btn disabled';
+      
+      // Status message
+      let statusMsg = 'Waiting for players...';
+      if (game.player1 && !game.player2) statusMsg = 'Waiting for Player 2...';
+      if (!game.player1 && game.player2) statusMsg = 'Waiting for Player 1...';
+      if (game.player1 && game.player2 && game.state === 'ready') statusMsg = 'Ready to start!';
+      if (game.state === 'running') statusMsg = 'Game in progress...';
+      if (game.state === 'finished') statusMsg = game.winner ? `${game.winner} wins!` : 'Game over!';
+      
+      return `
+        <div class="lightbike-setup" id="lightbike-setup-${artifactId}">
+          <div class="lightbike-player-row">
+            <span class="lightbike-player-label" style="color: var(--amber);">P1:</span>
+            ${player1Html}
+          </div>
+          <div class="lightbike-player-row">
+            <span class="lightbike-player-label" style="color: var(--blue);">P2:</span>
+            ${player2Html}
+          </div>
+        </div>
+        <canvas class="lightbike-canvas" id="lightbike-${artifactId}" width="250" height="250"></canvas>
+        <div class="lightbike-controls">
+          <button class="${startClass}" onclick="startLightBike('${artifactId}')" ${startDisabled}>START</button>
+          <span class="lightbike-status" id="lightbike-status-${artifactId}">${statusMsg}</span>
+        </div>
+      `;
+    }
+    
+    // Track lightbike game states
+    let lightbikeGames = {};
+    
+    // Player selects a bot for a slot
+    function selectLightBikePlayer(artifactId, playerNum, botName) {
+      if (!botName) return;
+      
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      
+      // Emit to server
+      socket.emit('lightbikeSelectPlayer', {
+        artifactId: artifactId,
+        playerNum: playerNum,
+        botName: botName,
+        owner: myName
+      });
+    }
+    
+    // Handle server update for lightbike game state
+    socket.on('lightbikeGameUpdate', (data) => {
+      const { artifactId, game } = data;
+      lightbikeGames[artifactId] = game;
+      
+      // Re-render the lightbike artifact if visible
+      refreshLightBikeDisplay(artifactId);
+    });
+    
+    // Refresh lightbike display after state change
+    function refreshLightBikeDisplay(artifactId) {
+      const setupEl = document.getElementById(`lightbike-setup-${artifactId}`);
+      if (!setupEl) return;
+      
+      // Find the parent artifact container and re-render
+      const container = setupEl.closest('.artifact-inline');
+      if (!container) return;
+      
+      const artifact = artifacts[artifactId];
+      if (!artifact) return;
+      
+      const version = parseInt(container.dataset.version) || 1;
+      const newHtml = renderLightBikeInline(artifactId);
+      
+      // Replace just the lightbike content
+      const contentEl = container.querySelector('.artifact-inline-content');
+      if (contentEl) {
+        contentEl.innerHTML = newHtml;
+        
+        // Redraw canvas if game is running
+        const game = lightbikeGames[artifactId];
+        if (game && (game.state === 'running' || game.state === 'finished')) {
+          drawLightBikeGame(artifactId, false);
+        }
+      }
+    }
+    
+    // Start the Light Bike game
+    function startLightBike(artifactId, fullscreen = false) {
+      const game = lightbikeGames[artifactId];
+      if (!game || !game.player1 || !game.player2) return;
+      
+      // Emit start to server
+      socket.emit('lightbikeStart', { artifactId: artifactId });
+    }
+    
+    // Handle game tick from server
+    socket.on('lightbikeTick', (data) => {
+      const { artifactId, gameState } = data;
+      lightbikeGames[artifactId] = { ...lightbikeGames[artifactId], ...gameState };
+      
+      // Draw the game
+      drawLightBikeGame(artifactId, false);
+      
+      // Also draw fullscreen if open
+      if (currentFullscreenArtifactId === artifactId) {
+        drawLightBikeGame(artifactId, true);
+      }
+      
+      // Update status
+      const statusEl = document.getElementById(`lightbike-status-${artifactId}`);
+      if (statusEl) {
+        if (gameState.state === 'running') {
+          statusEl.textContent = `Tick ${gameState.tick}`;
+        } else if (gameState.state === 'finished') {
+          statusEl.textContent = gameState.winner ? `${gameState.winner} wins!` : 'Draw!';
+        }
+      }
+    });
+    
+    // Draw the lightbike game on canvas
+    function drawLightBikeGame(artifactId, fullscreen) {
+      const canvasId = fullscreen ? `lightbike-fullscreen-${artifactId}` : `lightbike-${artifactId}`;
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      const game = lightbikeGames[artifactId];
+      if (!game) return;
+      
+      const width = canvas.width;
+      const height = canvas.height;
+      const cellSize = width / 50; // 50x50 grid
+      
+      // Clear
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+      
+      // Draw grid lines (subtle)
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= 50; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * cellSize, 0);
+        ctx.lineTo(i * cellSize, height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellSize);
+        ctx.lineTo(width, i * cellSize);
+        ctx.stroke();
+      }
+      
+      // Draw trails
+      if (game.trail1) {
+        ctx.fillStyle = '#ffaa00'; // amber for P1
+        game.trail1.forEach(pos => {
+          ctx.fillRect(pos.x * cellSize, pos.y * cellSize, cellSize, cellSize);
+        });
+      }
+      
+      if (game.trail2) {
+        ctx.fillStyle = '#00ddff'; // blue for P2
+        game.trail2.forEach(pos => {
+          ctx.fillRect(pos.x * cellSize, pos.y * cellSize, cellSize, cellSize);
+        });
+      }
+      
+      // Draw players (brighter)
+      if (game.pos1) {
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillRect(game.pos1.x * cellSize, game.pos1.y * cellSize, cellSize, cellSize);
+      }
+      
+      if (game.pos2) {
+        ctx.fillStyle = '#00ffff';
+        ctx.fillRect(game.pos2.x * cellSize, game.pos2.y * cellSize, cellSize, cellSize);
+      }
+      
+      // Draw "waiting" message if not started
+      if (!game.state || game.state === 'waiting' || game.state === 'ready') {
+        ctx.fillStyle = '#333';
+        ctx.font = `${cellSize * 2}px VT323`;
+        ctx.textAlign = 'center';
+        ctx.fillText('LIGHT BIKE', width/2, height/2 - cellSize);
+        ctx.fillStyle = '#555';
+        ctx.font = `${cellSize * 1.2}px VT323`;
+        ctx.fillText('Select players to begin', width/2, height/2 + cellSize);
+      }
+    }
+    
+    // Initialize lightbike canvas when artifact loads
+    function initLightBikeCanvas(artifactId) {
+      setTimeout(() => {
+        drawLightBikeGame(artifactId, false);
+      }, 100);
+    }
+    
+    // Render Light Bike game in fullscreen mode
+    function renderLightBikeFullscreen(artifactId) {
+      const game = lightbikeGames[artifactId] || { player1: null, player2: null, state: 'waiting' };
+      
+      // Get current user's bots
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
+      const myName = session ? session.name : '';
+      const myBots = registeredAgents.filter(a => a.owner === myName);
+      
+      // Add dummy bots for testing
+      const dummyBots = [
+        { name: '🤖 Random', value: 'dummy:random' },
+        { name: '🤖 Clockwise', value: 'dummy:clockwise' },
+        { name: '🤖 Survivor', value: 'dummy:survivor' }
+      ];
+      
+      // Build player 1 dropdown or locked display
+      let player1Html;
+      if (game.player1) {
+        player1Html = `<span class="lightbike-player-locked">${game.player1.bot} <span class="lightbike-player-owner">(${game.player1.owner})</span></span>`;
+      } else {
+        const myBotOptions = myBots.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+        const dummyOptions = dummyBots.map(b => `<option value="${b.value}">${b.name}</option>`).join('');
+        player1Html = `<select class="lightbike-select" id="lb-p1-fs-${artifactId}" onchange="selectLightBikePlayer('${artifactId}', 1, this.value)">
+          <option value="">Select Bot...</option>
+          ${myBotOptions}
+          <optgroup label="Test Bots">
+            ${dummyOptions}
+          </optgroup>
+        </select>`;
+      }
+      
+      // Build player 2 dropdown or locked display
+      let player2Html;
+      if (game.player2) {
+        player2Html = `<span class="lightbike-player-locked">${game.player2.bot} <span class="lightbike-player-owner">(${game.player2.owner})</span></span>`;
+      } else {
+        const myBotOptions = myBots.map(b => `<option value="${b.name}">${b.name}</option>`).join('');
+        const dummyOptions = dummyBots.map(b => `<option value="${b.value}">${b.name}</option>`).join('');
+        player2Html = `<select class="lightbike-select" id="lb-p2-fs-${artifactId}" onchange="selectLightBikePlayer('${artifactId}', 2, this.value)">
+          <option value="">Select Bot...</option>
+          ${myBotOptions}
+          <optgroup label="Test Bots">
+            ${dummyOptions}
+          </optgroup>
+        </select>`;
+      }
+      
+      // Start button
+      const canStart = game.player1 && game.player2 && game.state === 'ready';
+      const startDisabled = canStart ? '' : 'disabled';
+      const startClass = canStart ? 'lightbike-btn' : 'lightbike-btn disabled';
+      
+      // Status message
+      let statusMsg = 'Waiting for players...';
+      if (game.player1 && !game.player2) statusMsg = 'Waiting for Player 2...';
+      if (!game.player1 && game.player2) statusMsg = 'Waiting for Player 1...';
+      if (game.player1 && game.player2 && game.state === 'ready') statusMsg = 'Ready to start!';
+      if (game.state === 'running') statusMsg = `Tick ${game.tick || 0}`;
+      if (game.state === 'finished') statusMsg = game.winner ? `${game.winner} wins!` : 'Draw!';
+      
+      return `
+        <div class="lightbike-setup-fullscreen">
+          <div class="lightbike-player-row">
+            <span class="lightbike-player-label" style="color: var(--amber); font-size: 1.2rem;">P1:</span>
+            ${player1Html}
+          </div>
+          <div class="lightbike-player-row">
+            <span class="lightbike-player-label" style="color: var(--blue); font-size: 1.2rem;">P2:</span>
+            ${player2Html}
+          </div>
+        </div>
+        <canvas class="lightbike-canvas" id="lightbike-fullscreen-${artifactId}" width="600" height="600"></canvas>
+        <div class="lightbike-controls" style="width: 600px; justify-content: center;">
+          <button class="${startClass}" onclick="startLightBike('${artifactId}', true)" ${startDisabled} style="font-size: 1.1rem; padding: 0.5rem 1.5rem;">START</button>
+          <span class="lightbike-status" id="lightbike-status-fullscreen-${artifactId}" style="font-size: 1rem;">${statusMsg}</span>
+        </div>
+      `;
+    }
+    
+    // Expand artifact to fullscreen
+    function expandArtifact(artifactId, version) {
+      const artifact = artifacts[artifactId];
+      if (!artifact) return;
+      
+      currentFullscreenArtifactId = artifactId;
+      
+      const versionData = artifact.versions ? artifact.versions[version - 1] : null;
+      const content = versionData ? versionData.content : (artifact.content || '');
+      const typeIcon = getArtifactTypeIcon(artifact.type);
+      
+      document.getElementById('fullscreenTitle').innerHTML = `
+        <span class="artifact-type-icon">${typeIcon}</span>
+        <span>${escapeHtml(artifact.name)}</span>
+        <span style="color: #555; margin-left: 0.5rem;">v${version}</span>
+      `;
+      
+      const contentEl = document.getElementById('fullscreenContent');
+      
+      if (artifact.type === 'image') {
+        contentEl.innerHTML = `<img src="${escapeHtml(content)}">`;
+        contentEl.className = 'artifact-fullscreen-content';
+      } else if (artifact.type === 'lightbike') {
+        contentEl.innerHTML = `
+          <div class="lightbike-game-container-fullscreen">
+            ${renderLightBikeFullscreen(artifactId)}
+          </div>
+        `;
+        contentEl.className = 'artifact-fullscreen-content';
+        // Draw canvas after render
+        setTimeout(() => drawLightBikeGame(artifactId, true), 50);
+      } else if (artifact.type === 'markdown') {
+        contentEl.innerHTML = renderSimpleMarkdown(content);
+        contentEl.className = 'artifact-fullscreen-content markdown-content';
+      } else if (artifact.type === 'html') {
+        contentEl.innerHTML = `<iframe srcdoc="${escapeHtml(content).replace(/"/g, '&quot;')}" style="width: 100%; height: 80vh; border: 1px solid #333; background: #fff;"></iframe>`;
+        contentEl.className = 'artifact-fullscreen-content';
+      } else {
+        contentEl.innerHTML = `<pre>${escapeHtml(content)}</pre>`;
+        contentEl.className = 'artifact-fullscreen-content';
+      }
+      
+      document.getElementById('artifactFullscreen').classList.add('open');
+    }
+    
+    function closeFullscreen() {
+      document.getElementById('artifactFullscreen').classList.remove('open');
+      currentFullscreenArtifactId = null;
+    }
+    
+    function openArtifactSourceFromFullscreen() {
+      if (currentFullscreenArtifactId) {
+        const artifactId = currentFullscreenArtifactId;
+        closeFullscreen();
+        openArtifactSource(artifactId);
+      }
+    }
+    
+    // Open artifact source in right sidebar (renamed from openArtifact)
+    function openArtifactSource(id, versionNum) {
+      openArtifact(id, versionNum);
+    }
     
     // Show right resize handle when sidebar opens
     function openArtifact(id, versionNum) {
@@ -3573,7 +4822,7 @@ export { authenticateUser };`
       
       // Show edit button for code and markdown only (edits latest version)
       let editBtnHtml = '';
-      if (artifact.type !== 'image') {
+      if (artifact.type !== 'image' && artifact.type !== 'lightbike') {
         editBtnHtml = `<button class="edit-artifact-btn" onclick="editArtifact('${id}')">EDIT</button>`;
       }
       
@@ -3590,14 +4839,14 @@ export { authenticateUser };`
       `;
       
       const contentEl = document.getElementById('artifactContent');
-      if (artifact.type === 'html') {
-        contentEl.innerHTML = `<iframe srcdoc="${escapeHtml(content).replace(/"/g, '&quot;')}" style="width: 100%; height: 300px; border: 1px solid #333; background: #fff;"></iframe>`;
-      } else if (artifact.type === 'javascript' || artifact.type === 'code' || artifact.type === 'python' || artifact.type === 'hoon' || artifact.type === 'css' || artifact.type === 'other') {
-        contentEl.innerHTML = `<pre><code>${escapeHtml(content)}</code></pre>`;
-      } else if (artifact.type === 'image') {
-        contentEl.innerHTML = `<img src="${content}" style="max-width: 100%; height: auto;">`;
+      // In source view, always show raw content
+      if (artifact.type === 'image') {
+        contentEl.innerHTML = `<div style="color: #666; margin-bottom: 0.5rem;">Image URL:</div><pre><code>${escapeHtml(content)}</code></pre><img src="${content}" style="max-width: 100%; height: auto; margin-top: 1rem;">`;
+      } else if (artifact.type === 'lightbike') {
+        contentEl.innerHTML = `<div style="color: #666; margin-bottom: 0.5rem;">Game Config:</div><pre><code>${escapeHtml(content)}</code></pre>`;
       } else {
-        contentEl.innerHTML = renderSimpleMarkdown(content);
+        // All code types including markdown - show raw source
+        contentEl.innerHTML = `<pre><code>${escapeHtml(content)}</code></pre>`;
       }
       
       document.getElementById('rightSidebar').classList.add('open');
@@ -3666,34 +4915,382 @@ export { authenticateUser };`
       document.getElementById('lightbox').classList.remove('open');
     }
     
-    // Wallet functions
-    function initWallet() {
-      let wallet = localStorage.getItem('grimoire_wallet');
-      if (!wallet) {
-        wallet = {
-          balance: 100000.00,
-          transactions: []
-        };
-        localStorage.setItem('grimoire_wallet', JSON.stringify(wallet));
+    // Escape key closes fullscreen and lightbox
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if (document.getElementById('artifactFullscreen').classList.contains('open')) {
+          closeFullscreen();
+        } else if (document.getElementById('lightbox').classList.contains('open')) {
+          closeLightbox();
+        }
       }
-      return JSON.parse(localStorage.getItem('grimoire_wallet'));
+    });
+    
+    // Wallet functions
+    
+    // Iris wallet state
+    let irisWallet = {
+      connected: false,
+      address: null,
+      balance: 0,
+      transactions: []
+    };
+    
+    // NockBlocks API - proxied through GRIMOIRE server
+    const NICKS_PER_NOCK = 65536;
+    
+    // Initialize wallet - check if previously connected
+    function initWallet() {
+      const saved = localStorage.getItem('grimoire_iris_wallet');
+      if (saved) {
+        const data = JSON.parse(saved);
+        irisWallet.address = data.address;
+        irisWallet.connected = true;
+        irisWallet.transactions = data.transactions || [];
+        
+        // Re-register wallet address with server on reconnect
+        if (irisWallet.address) {
+          socket.emit('registerWalletAddress', { address: irisWallet.address });
+        }
+        // Will refresh balance when wallet panel opens
+      }
     }
     
-    function saveWallet(wallet) {
-      localStorage.setItem('grimoire_wallet', JSON.stringify(wallet));
+    function saveWalletState() {
+      localStorage.setItem('grimoire_iris_wallet', JSON.stringify({
+        address: irisWallet.address,
+        transactions: irisWallet.transactions
+      }));
     }
     
-    function formatBalance(amount) {
-      return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $NOCK';
+    function formatBalance(nockAmount) {
+      return nockAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $NOCK';
     }
     
-    // Store current wallet state from server
-    let currentWallet = { balance: 100000, transactions: [] };
+    function formatNicks(nicks) {
+      return (nicks / NICKS_PER_NOCK).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' $NOCK';
+    }
+    
+    // Check if Iris is installed
+    function isIrisInstalled() {
+      return typeof window.nockchain !== 'undefined';
+    }
+    
+    // Connect to Iris wallet
+    async function connectIrisWallet() {
+      const statusEl = document.getElementById('walletConnectStatus');
+      
+      if (!isIrisInstalled()) {
+        statusEl.textContent = 'Iris wallet not detected. Please install the Iris browser extension.';
+        statusEl.className = 'wallet-connect-status error';
+        return;
+      }
+      
+      statusEl.textContent = 'Connecting... (approve in Iris popup)';
+      statusEl.className = 'wallet-connect-status';
+      
+      try {
+        const result = await window.nockchain.request({ method: 'nock_connect', timeout: 120000 });
+        
+        if (result && result.pkh) {
+          irisWallet.connected = true;
+          irisWallet.address = result.pkh;
+          saveWalletState();
+          
+          // Register wallet address with server for username lookup
+          socket.emit('registerWalletAddress', { address: result.pkh });
+          
+          // Update UI
+          updateWalletUI();
+          
+          // Fetch balance
+          await refreshIrisBalance();
+        } else {
+          statusEl.textContent = 'Connection failed. Please try again.';
+          statusEl.className = 'wallet-connect-status error';
+        }
+      } catch (err) {
+        console.error('Iris connect error:', err);
+        const msg = err.message || '';
+        
+        if (msg.includes('not responding') || msg.includes('Extension')) {
+          statusEl.textContent = 'Iris not responding. Refresh page and try again.';
+        } else if (msg.includes('rejected') || msg.includes('denied')) {
+          statusEl.textContent = 'Connection cancelled.';
+        } else {
+          statusEl.textContent = msg || 'Connection failed. Please try again.';
+        }
+        statusEl.className = 'wallet-connect-status error';
+      }
+    }
+    
+    // Disconnect wallet
+    function disconnectIrisWallet() {
+      irisWallet.connected = false;
+      irisWallet.address = null;
+      irisWallet.balance = 0;
+      irisWallet.transactions = [];
+      localStorage.removeItem('grimoire_iris_wallet');
+      updateWalletUI();
+    }
+    
+    // Toggle address expand/copy
+    function toggleAddressExpand() {
+      const fullEl = document.getElementById('walletAddressFull');
+      const shortEl = document.getElementById('walletAddress');
+      
+      if (fullEl.style.display === 'none') {
+        // Expand - show full address
+        fullEl.textContent = irisWallet.address;
+        fullEl.style.display = 'block';
+        shortEl.style.display = 'none';
+        
+        // Copy to clipboard
+        navigator.clipboard.writeText(irisWallet.address).then(() => {
+          fullEl.textContent = irisWallet.address + ' (copied!)';
+          setTimeout(() => {
+            fullEl.textContent = irisWallet.address;
+          }, 1500);
+        });
+      } else {
+        // Collapse - show truncated
+        fullEl.style.display = 'none';
+        shortEl.style.display = 'inline';
+      }
+    }
+    
+    // Update wallet UI based on connection state
+    function updateWalletUI() {
+      const connectSection = document.getElementById('walletConnectSection');
+      const connectedSection = document.getElementById('walletConnectedSection');
+      
+      if (irisWallet.connected && irisWallet.address) {
+        connectSection.style.display = 'none';
+        connectedSection.style.display = 'block';
+        
+        // Show truncated address
+        const addr = irisWallet.address;
+        const truncated = addr.length > 20 ? addr.substring(0, 10) + '...' + addr.substring(addr.length - 8) : addr;
+        document.getElementById('walletAddress').textContent = truncated;
+        document.getElementById('walletAddress').style.display = 'inline';
+        document.getElementById('walletAddressFull').style.display = 'none';
+        
+        document.getElementById('walletBalance').textContent = formatBalance(irisWallet.balance);
+        renderTransactions(irisWallet.transactions);
+      } else {
+        connectSection.style.display = 'block';
+        connectedSection.style.display = 'none';
+        document.getElementById('walletConnectStatus').textContent = '';
+      }
+    }
+    
+    // Fetch balance via GRIMOIRE server proxy
+    async function refreshIrisBalance() {
+      if (!irisWallet.address) return;
+      
+      document.getElementById('walletBalance').textContent = 'Loading...';
+      
+      try {
+        const url = `/api/balance/${encodeURIComponent(irisWallet.address)}`;
+        console.log('Fetching balance from:', url);
+        
+        const response = await fetch(url);
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Balance data:', data);
+        
+        if (data.success && data.balance !== undefined) {
+          // Balance returned in nicks from server
+          irisWallet.balance = data.balance / NICKS_PER_NOCK;
+        } else {
+          irisWallet.balance = 0;
+        }
+        
+        document.getElementById('walletBalance').textContent = formatBalance(irisWallet.balance);
+      } catch (err) {
+        console.error('Balance fetch error:', err);
+        document.getElementById('walletBalance').textContent = '? (API error)';
+      }
+    }
+    
+    // Wrapped NOCK on Base
+    const WRAPPED_NOCK_ADDRESS = '0x9B5E262cF9bb04869ab40b19AF91D2dc85761722';
+    const WRAPPED_NOCK_DECIMALS = 16;
+    const BASE_CHAIN_ID = '0x2105'; // 8453 in hex
+    
+    // ERC-20 transfer ABI (minimal)
+    const ERC20_ABI = [
+      'function transfer(address to, uint256 amount) returns (bool)',
+      'function balanceOf(address owner) view returns (uint256)'
+    ];
+    
+    // Send wrapped NOCK via MetaMask
+    async function sendNock() {
+      const to = document.getElementById('sendTo').value.trim();
+      const amount = parseFloat(document.getElementById('sendAmount').value);
+      
+      if (!to) {
+        alert('Please enter a recipient');
+        return;
+      }
+      
+      if (!amount || amount <= 0) {
+        alert('Please enter a valid amount');
+        return;
+      }
+      
+      // Check if MetaMask is available
+      if (typeof window.ethereum === 'undefined') {
+        alert('MetaMask not detected');
+        return;
+      }
+      
+      // Look up recipient's ETH address if it's a username
+      let recipientAddress = to;
+      if (!to.startsWith('0x')) {
+        try {
+          const resp = await fetch(`/api/wallet-address/${encodeURIComponent(to)}`);
+          const data = await resp.json();
+          
+          if (data.success && data.address) {
+            console.log(`Resolved ${to} → ${data.address}`);
+            recipientAddress = data.address;
+          } else {
+            alert(`User "${to}" hasn't connected a wallet yet`);
+            return;
+          }
+        } catch (err) {
+          console.error('Address lookup failed:', err);
+          alert(`Could not find wallet for "${to}"`);
+          return;
+        }
+      }
+      
+      try {
+        // Check we're on Base first, switch if needed
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        
+        if (currentChainId !== BASE_CHAIN_ID) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: BASE_CHAIN_ID }]
+            });
+          } catch (switchError) {
+            // Chain not added, try to add it
+            if (switchError.code === 4902) {
+              await window.ethereum.request({
+                method: 'wallet_addEthereumChain',
+                params: [{
+                  chainId: BASE_CHAIN_ID,
+                  chainName: 'Base',
+                  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                  rpcUrls: ['https://mainnet.base.org'],
+                  blockExplorerUrls: ['https://basescan.org']
+                }]
+              });
+            } else {
+              alert('Please switch to Base network in MetaMask');
+              return;
+            }
+          }
+        }
+        
+        // Now connect with Base network
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);
+        
+        const signer = provider.getSigner();
+        
+        // Create contract instance
+        const nockContract = new ethers.Contract(WRAPPED_NOCK_ADDRESS, ERC20_ABI, signer);
+        
+        // Convert amount to wei (16 decimals)
+        const amountWei = ethers.utils.parseUnits(amount.toString(), WRAPPED_NOCK_DECIMALS);
+        
+        // Get source message ID for reply sends
+        const sourceMessageId = document.getElementById('sendModal').getAttribute('data-source-message');
+        
+        console.log('Sending wrapped NOCK:', { to: recipientAddress, toOriginal: to, amount: amount, amountWei: amountWei.toString() });
+        
+        // Verify we have a valid ETH address
+        if (!recipientAddress.startsWith('0x') || recipientAddress.length !== 42) {
+          alert('Invalid recipient address: ' + recipientAddress);
+          return;
+        }
+        
+        // Send transaction
+        const tx = await nockContract.transfer(recipientAddress, amountWei);
+        
+        closeSendModal();
+        alert('Transaction sent! Waiting for confirmation...');
+        
+        // Wait for confirmation
+        const receipt = await tx.wait();
+        console.log('Transaction confirmed:', receipt);
+        
+        // Notify server - it will handle transaction logging and DM/reply
+        socket.emit('nockSendConfirmed', {
+          to: to,  // original username or address
+          amount: amount,
+          txHash: receipt.transactionHash,
+          replyToMessageId: sourceMessageId || null
+        });
+        
+        alert('Transaction confirmed! TxHash: ' + receipt.transactionHash);
+        
+        // Refresh balance
+        refreshWrappedNockBalance();
+        
+      } catch (err) {
+        console.error('Send error:', err);
+        if (err.code === 4001) {
+          alert('Transaction cancelled');
+        } else {
+          alert('Transaction failed: ' + (err.message || 'Unknown error'));
+        }
+      }
+    }
+    
+    // Get wrapped NOCK balance from Base
+    async function refreshWrappedNockBalance() {
+      if (!connectedEthAddress) return;
+      
+      try {
+        // Use Base RPC directly for balance check (don't need to switch MetaMask)
+        const baseProvider = new ethers.providers.JsonRpcProvider('https://mainnet.base.org');
+        const nockContract = new ethers.Contract(WRAPPED_NOCK_ADDRESS, ERC20_ABI, baseProvider);
+        const balance = await nockContract.balanceOf(connectedEthAddress);
+        const balanceFormatted = parseFloat(ethers.utils.formatUnits(balance, WRAPPED_NOCK_DECIMALS));
+        
+        document.getElementById('walletBalance').textContent = formatBalance(balanceFormatted);
+        currentWallet.balance = balanceFormatted;
+      } catch (err) {
+        console.error('Balance fetch error:', err);
+        document.getElementById('walletBalance').textContent = '? (switch to Base)';
+      }
+    }
+    
+    // Store current wallet state
+    let currentWallet = { balance: 0, transactions: [] };
     
     function toggleWallet() {
-      document.getElementById('walletBalance').textContent = formatBalance(currentWallet.balance);
-      renderTransactions(currentWallet.transactions);
       document.getElementById('walletOverlay').classList.add('open');
+      
+      // Refresh balance if connected
+      if (connectedEthAddress) {
+        refreshWrappedNockBalance();
+      } else {
+        document.getElementById('walletBalance').textContent = 'Connect wallet to view';
+      }
+      
+      // Request transactions from server
+      socket.emit('getWallet');
     }
     
     function closeWallet() {
@@ -3703,18 +5300,27 @@ export { authenticateUser };`
     function renderTransactions(transactions) {
       const container = document.getElementById('walletTransactions');
       
-      if (transactions.length === 0) {
+      if (!transactions || transactions.length === 0) {
         container.innerHTML = '<div class="wallet-empty">No transactions yet</div>';
         return;
       }
       
-      container.innerHTML = transactions.slice().reverse().map(tx => `
+      // Helper to truncate addresses
+      const truncate = (addr) => {
+        if (!addr) return 'Unknown';
+        if (addr.startsWith('0x') && addr.length > 12) {
+          return addr.substring(0, 6) + '...' + addr.substring(addr.length - 4);
+        }
+        return addr;
+      };
+      
+      container.innerHTML = transactions.map(tx => `
         <div class="wallet-transaction">
           <div class="wallet-transaction-row">
-            <span class="wallet-transaction-who">${tx.type === 'sent' ? 'To: ' : 'From: '}${tx.who}</span>
-            <span class="wallet-transaction-amount ${tx.type}">${tx.type === 'sent' ? '-' : '+'}${formatBalance(tx.amount).replace(' $NOCK', '')} $NOCK</span>
+            <span class="wallet-transaction-who">${tx.type === 'sent' ? 'To: ' : 'From: '}${truncate(tx.to || tx.from || tx.who)}</span>
+            <span class="wallet-transaction-amount ${tx.type}">${tx.type === 'sent' ? '-' : '+'}${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $NOCK</span>
           </div>
-          <div class="wallet-transaction-time">${tx.time}</div>
+          <div class="wallet-transaction-time">${tx.time}${tx.txid ? ' • ' + tx.txid.substring(0, 8) + '...' : ''}</div>
         </div>
       `).join('');
     }
@@ -3722,6 +5328,7 @@ export { authenticateUser };`
     function openSendModal() {
       document.getElementById('sendTo').value = '';
       document.getElementById('sendAmount').value = '';
+      document.getElementById('sendModal').setAttribute('data-source-message', '');
       document.getElementById('sendModal').classList.add('open');
       document.getElementById('sendTo').focus();
     }
@@ -3747,33 +5354,6 @@ export { authenticateUser };`
     
     function closeContractsModal() {
       document.getElementById('contractsModal').classList.remove('open');
-    }
-    
-    function sendNock() {
-      const to = document.getElementById('sendTo').value.trim();
-      const amount = parseFloat(document.getElementById('sendAmount').value);
-      
-      if (!to) {
-        alert('Please enter a recipient');
-        return;
-      }
-      
-      if (!amount || amount <= 0) {
-        alert('Please enter a valid amount');
-        return;
-      }
-      
-      const sourceMessageId = document.getElementById('sendModal').getAttribute('data-source-message');
-      
-      // Send to server
-      socket.emit('sendNock', {
-        to: to,
-        amount: amount,
-        replyToMessageId: sourceMessageId || null
-      });
-      
-      closeSendModal();
-      closeWallet();
     }
     
     function sendToUser(recipient, messageId) {
@@ -3868,7 +5448,7 @@ export { authenticateUser };`
       const container = document.getElementById('agentsList');
       
       // Get current user
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       const myName = session ? session.name : '';
       
       // Show all agents, but indicate ownership
@@ -3926,6 +5506,11 @@ export { authenticateUser };`
       } else {
         arrow.classList.remove('expanded');
         content.classList.remove('expanded');
+      }
+      
+      // Update section header notification dot
+      if (section === 'shared') {
+        renderNotesList();
       }
     }
     
@@ -4129,15 +5714,26 @@ export { authenticateUser };`
         return 0; // Keep original order for notes without notifications
       });
       
+      let sharedHasNotif = false;
+      
       topLevelNotes.forEach(note => {
         const html = renderNoteItem(note, 0);
+        const noteHasNotif = hasNotification(note.id);
         
         if (note.type === 'dm') {
           sharedList.innerHTML += html;
+          if (noteHasNotif) sharedHasNotif = true;
         } else {
           notesList.innerHTML += html;
         }
       });
+      
+      // Show green dot on SHARED header only when collapsed AND has notifications
+      const sharedNotifEl = document.getElementById('sharedNotification');
+      if (sharedNotifEl) {
+        const sharedCollapsed = !expandedSections['shared'];
+        sharedNotifEl.classList.toggle('active', sharedCollapsed && sharedHasNotif);
+      }
     }
     
     function renderNoteItem(note, depth) {
@@ -4383,7 +5979,7 @@ export { authenticateUser };`
       const confirmBtn = document.getElementById('inviteConfirmBtn');
       
       // Get current user
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       const myName = session ? session.name : '';
       
       // Filter out self, already invited users, and agents
@@ -4464,7 +6060,7 @@ export { authenticateUser };`
     
     // Find existing shared note with a user
     function findExistingDM(userName) {
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       const myName = session ? session.name : '';
       
       for (const [id, note] of Object.entries(notes)) {
@@ -4494,7 +6090,7 @@ export { authenticateUser };`
       const note = notes[noteId];
       if (!note) return;
       
-      const session = JSON.parse(localStorage.getItem('grimoire_session'));
+      const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
       const myName = session ? session.name : '';
       
       // Check if this is a notebook being shared (not already shared)
@@ -4641,7 +6237,7 @@ export { authenticateUser };`
         
         // Update name - for 2 people, keep showing other person's name
         // for 3+, use the comma list name sent from server
-        const session = JSON.parse(localStorage.getItem('grimoire_session'));
+        const session = JSON.parse(sessionStorage.getItem('grimoire_session'));
         const myName = session ? session.name : '';
         
         if (users && users.length === 2) {

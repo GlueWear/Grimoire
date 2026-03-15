@@ -18,12 +18,86 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================
+// NOCKBLOCKS API PROXY
+// ============================================
+
+const NOCKBLOCKS_URL = 'https://nockblocks.com/rpc/v1';
+const NOCKBLOCKS_API_KEY = 'SlfkgK63EJtLJHn2aXYztjzPkCUAGOuOZ7FivhlWtDc';
+
+// Get balance for a Nockchain address
+app.get('/api/balance/:address', async (req, res) => {
+  const { address } = req.params;
+  
+  if (!address) {
+    return res.status(400).json({ success: false, message: 'Address required' });
+  }
+  
+  try {
+    const response = await fetch(NOCKBLOCKS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${NOCKBLOCKS_API_KEY}`
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'getNotesByAddress',
+        params: [{ address, showSpent: false }],
+        id: 1
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message || JSON.stringify(data.error));
+    }
+    
+    const notes = data.result || [];
+    const totalBalance = notes.reduce((sum, note) => sum + (note.assets || note.amount || 0), 0);
+    
+    res.json({
+      success: true,
+      address,
+      balance: totalBalance,
+      noteCount: notes.length
+    });
+  } catch (error) {
+    console.error('NockBlocks API error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get wallet address for a username
+app.get('/api/wallet-address/:username', (req, res) => {
+  const { username } = req.params;
+  
+  if (!username) {
+    return res.status(400).json({ success: false, message: 'Username required' });
+  }
+  
+  const address = state.walletAddresses[username.toLowerCase()];
+  
+  if (!address) {
+    return res.status(404).json({ success: false, message: 'No wallet registered for this user' });
+  }
+  
+  res.json({ success: true, address });
+});
+
+// ============================================
 // IN-MEMORY DATA STORE
 // ============================================
 
 const state = {
-  // Users currently connected
+  // Users currently connected (socketId → user object)
   users: new Map(),
+  
+  // User sessions - maps username to Set of socketIds (for multi-session support)
+  userSessions: new Map(),
+  
+  // Active usernames (for uniqueness enforcement - visitors/agents only)
+  activeUsernames: new Set(),
   
   // Notes: { noteId: { id, name, type, users, messages, children, parent, visibility, writable } }
   notes: {
@@ -45,10 +119,13 @@ const state = {
   // Artifacts: { id: { name, type, creator, creatorType, contributors, versions } }
   artifacts: {},
   
-  // Wallets: { odket
+  // Wallets: keyed by username (not socketId)
   wallets: {},
   
-  // Registered bot webhooks: { odket
+  // Wallet address mapping: username → Iris wallet address (pkh)
+  walletAddresses: {},
+  
+  // Registered bot webhooks: { socketId: bot }
   bots: {}
 };
 
@@ -66,23 +143,58 @@ function getTimeString() {
          now.getMinutes().toString().padStart(2, '0');
 }
 
-function initWallet(userId) {
-  if (!state.wallets[userId]) {
-    state.wallets[userId] = {
+function initWallet(username) {
+  if (!state.wallets[username]) {
+    state.wallets[username] = {
       balance: 100000.00,
       transactions: []
     };
   }
-  return state.wallets[userId];
+  return state.wallets[username];
+}
+
+// Get all socket IDs for a username
+function getSocketsForUser(username) {
+  return state.userSessions.get(username.toLowerCase()) || new Set();
+}
+
+// Emit to all sockets for a user
+function emitToUser(username, event, data) {
+  const sockets = getSocketsForUser(username);
+  sockets.forEach(socketId => {
+    const socket = io.sockets.sockets.get(socketId);
+    if (socket) {
+      socket.emit(event, data);
+    }
+  });
+}
+
+// Get deduplicated user list (unique by name)
+function getUniqueUsers() {
+  const seen = new Map();
+  state.users.forEach(u => {
+    if (!seen.has(u.name.toLowerCase())) {
+      seen.set(u.name.toLowerCase(), { name: u.name, type: u.type });
+    }
+  });
+  return Array.from(seen.values());
 }
 
 function broadcastUserList() {
-  const userList = Array.from(state.users.values()).map(u => ({
-    id: u.id,
-    name: u.name,
-    type: u.type
-  }));
+  const userList = getUniqueUsers();
   io.emit('userList', userList);
+}
+
+// Broadcast an event to all unique users in a note (handles multi-session)
+function broadcastToNote(noteId, event, data) {
+  const notifiedUsers = new Set();
+  const userIds = getUsersInNote(noteId);
+  userIds.forEach(id => {
+    const user = state.users.get(id);
+    if (!user || notifiedUsers.has(user.name.toLowerCase())) return;
+    notifiedUsers.add(user.name.toLowerCase());
+    emitToUser(user.name, event, data);
+  });
 }
 
 function canAccessNote(socketId, note) {
@@ -129,6 +241,107 @@ function getUsersInNote(noteId) {
   });
   
   return socketIds;
+}
+
+// --------------------------------------------
+// LIGHT BIKE GAME HELPERS
+// --------------------------------------------
+
+function applyLightBikeMove(pos, move) {
+  const directions = ['north', 'east', 'south', 'west'];
+  let dirIdx = directions.indexOf(pos.direction);
+  
+  if (move === 'LEFT') {
+    dirIdx = (dirIdx + 3) % 4; // Turn left
+  } else if (move === 'RIGHT') {
+    dirIdx = (dirIdx + 1) % 4; // Turn right
+  }
+  
+  const newDir = directions[dirIdx];
+  let newX = pos.x;
+  let newY = pos.y;
+  
+  switch (newDir) {
+    case 'north': newY--; break;
+    case 'south': newY++; break;
+    case 'east': newX++; break;
+    case 'west': newX--; break;
+  }
+  
+  return { x: newX, y: newY, direction: newDir };
+}
+
+function checkLightBikeCollision(pos, ownTrail, enemyTrail) {
+  // Wall collision
+  if (pos.x < 0 || pos.x >= 50 || pos.y < 0 || pos.y >= 50) {
+    return true;
+  }
+  
+  // Own trail collision (skip last position which is current)
+  for (let i = 0; i < ownTrail.length - 1; i++) {
+    if (ownTrail[i].x === pos.x && ownTrail[i].y === pos.y) {
+      return true;
+    }
+  }
+  
+  // Enemy trail collision
+  for (let i = 0; i < enemyTrail.length; i++) {
+    if (enemyTrail[i].x === pos.x && enemyTrail[i].y === pos.y) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Dummy bot AI for testing
+function getDummyBotMove(dummyType, myPos, enemyPos, myTrail, enemyTrail) {
+  const moves = ['LEFT', 'RIGHT', 'STRAIGHT'];
+  
+  switch (dummyType) {
+    case 'random':
+      // Pure random
+      return moves[Math.floor(Math.random() * 3)];
+      
+    case 'clockwise':
+      // Always tries to turn right, goes straight if would crash
+      const rightMove = applyLightBikeMove(myPos, 'RIGHT');
+      if (!checkLightBikeCollision(rightMove, myTrail, enemyTrail)) {
+        return 'RIGHT';
+      }
+      const straightMove = applyLightBikeMove(myPos, 'STRAIGHT');
+      if (!checkLightBikeCollision(straightMove, myTrail, enemyTrail)) {
+        return 'STRAIGHT';
+      }
+      return 'LEFT';
+      
+    case 'survivor':
+      // Tries to survive - picks move that doesn't crash, prefers straight
+      const straight = applyLightBikeMove(myPos, 'STRAIGHT');
+      const left = applyLightBikeMove(myPos, 'LEFT');
+      const right = applyLightBikeMove(myPos, 'RIGHT');
+      
+      const straightSafe = !checkLightBikeCollision(straight, myTrail, enemyTrail);
+      const leftSafe = !checkLightBikeCollision(left, myTrail, enemyTrail);
+      const rightSafe = !checkLightBikeCollision(right, myTrail, enemyTrail);
+      
+      // Prefer straight, then pick randomly between safe options
+      if (straightSafe) return 'STRAIGHT';
+      
+      const safeOptions = [];
+      if (leftSafe) safeOptions.push('LEFT');
+      if (rightSafe) safeOptions.push('RIGHT');
+      
+      if (safeOptions.length > 0) {
+        return safeOptions[Math.floor(Math.random() * safeOptions.length)];
+      }
+      
+      // No safe moves, just go straight and die
+      return 'STRAIGHT';
+      
+    default:
+      return 'STRAIGHT';
+  }
 }
 
 // Add user to a note and all its children recursively
@@ -185,6 +398,27 @@ io.on('connection', (socket) => {
   // --------------------------------------------
   socket.on('join', (data) => {
     const { name, type } = data;
+    const nameLower = name.toLowerCase();
+    
+    // Check if username is already taken (only for non-urbit users)
+    // Urbit IDs are authenticated by MetaMask, so same person can have multiple sessions
+    if (type !== 'urbit' && state.activeUsernames.has(nameLower)) {
+      socket.emit('joinError', { 
+        message: `The name "${name}" is already in use. Please choose another.` 
+      });
+      return;
+    }
+    
+    // Reserve the username (case-insensitive) - for non-urbit only
+    if (type !== 'urbit') {
+      state.activeUsernames.add(nameLower);
+    }
+    
+    // Track this socket for the user
+    if (!state.userSessions.has(nameLower)) {
+      state.userSessions.set(nameLower, new Set());
+    }
+    state.userSessions.get(nameLower).add(socket.id);
     
     state.users.set(socket.id, {
       id: socket.id,
@@ -194,10 +428,10 @@ io.on('connection', (socket) => {
       currentNote: 'cover'
     });
     
-    // Initialize wallet
-    initWallet(socket.id);
+    // Initialize wallet (keyed by username, not socket)
+    initWallet(name);
     
-    console.log(`User joined: ${name} (${type})`);
+    console.log(`User joined: ${name} (${type}) - ${state.userSessions.get(nameLower).size} session(s)`);
     
     // Get notes this user has access to
     const userNotes = {};
@@ -212,16 +446,18 @@ io.on('connection', (socket) => {
       notes: userNotes,
       currentNote: 'cover',
       artifacts: state.artifacts,
-      wallet: state.wallets[socket.id],
-      users: Array.from(state.users.values()).map(u => ({ name: u.name, type: u.type })),
+      wallet: state.wallets[name],
+      users: getUniqueUsers(),
       agents: Object.values(state.bots).map(b => ({ name: b.name, owner: b.owner }))
     });
     
-    // Broadcast updated user list
+    // Broadcast updated user list (deduped)
     broadcastUserList();
     
-    // Notify others
-    socket.broadcast.emit('userJoined', { name, type });
+    // Notify others (only if this is the first session for this user)
+    if (state.userSessions.get(nameLower).size === 1) {
+      socket.broadcast.emit('userJoined', { name, type });
+    }
   });
   
   // --------------------------------------------
@@ -301,15 +537,11 @@ io.on('connection', (socket) => {
     // Send note to creator
     socket.emit('noteCreated', { note });
     
-    // If shared (has other users), notify them too
+    // If shared (has other users), notify them too (all their sessions)
     if (noteUsers.length > 1) {
       noteUsers.forEach(userName => {
         if (userName === user.name) return; // Skip creator, already sent
-        
-        const recipient = Array.from(state.users.values()).find(u => u.name === userName);
-        if (recipient) {
-          io.to(recipient.id).emit('noteCreated', { note });
-        }
+        emitToUser(userName, 'noteCreated', { note });
       });
     }
   });
@@ -428,27 +660,23 @@ io.on('connection', (socket) => {
     
     console.log(`${user.name} converted note ${noteId} to DM with ${userName}, users: ${note.users}`);
     
-    // Notify the recipient - send main note and all children
-    const recipient = Array.from(state.users.values()).find(u => u.name === userName);
-    if (recipient) {
-      // Send main note
-      const recipientNote = { ...note, name: user.name };
-      io.to(recipient.id).emit('noteInvite', { 
-        note: recipientNote, 
-        fromUser: user.name 
-      });
-      
-      // Send all children
-      const allNotes = collectNoteTree(noteId);
-      allNotes.forEach(n => {
-        if (n.id !== noteId) {
-          io.to(recipient.id).emit('noteInvite', {
-            note: n,
-            fromUser: user.name
-          });
-        }
-      });
-    }
+    // Notify the recipient (all their sessions) - send main note and all children
+    const recipientNote = { ...note, name: user.name };
+    emitToUser(userName, 'noteInvite', { 
+      note: recipientNote, 
+      fromUser: user.name 
+    });
+    
+    // Send all children
+    const allNotes = collectNoteTree(noteId);
+    allNotes.forEach(n => {
+      if (n.id !== noteId) {
+        emitToUser(userName, 'noteInvite', {
+          note: n,
+          fromUser: user.name
+        });
+      }
+    });
   });
   
   // --------------------------------------------
@@ -509,27 +737,24 @@ io.on('connection', (socket) => {
       dm: sharerDm 
     });
     
-    // Notify the recipient - send DM, note, and all children
-    const recipient = Array.from(state.users.values()).find(u => u.name === userName);
-    if (recipient) {
-      const recipientDm = { ...dm, name: user.name };
-      io.to(recipient.id).emit('noteShared', { 
-        note: note, 
-        dm: recipientDm,
-        fromUser: user.name
-      });
-      
-      // Send all children of the shared note
-      const allNotes = collectNoteTree(noteId);
-      allNotes.forEach(n => {
-        if (n.id !== noteId) {
-          io.to(recipient.id).emit('noteInvite', {
-            note: n,
-            fromUser: user.name
-          });
-        }
-      });
-    }
+    // Notify the recipient (all their sessions) - send DM, note, and all children
+    const recipientDm = { ...dm, name: user.name };
+    emitToUser(userName, 'noteShared', { 
+      note: note, 
+      dm: recipientDm,
+      fromUser: user.name
+    });
+    
+    // Send all children of the shared note
+    const allNotes = collectNoteTree(noteId);
+    allNotes.forEach(n => {
+      if (n.id !== noteId) {
+        emitToUser(userName, 'noteInvite', {
+          note: n,
+          fromUser: user.name
+        });
+      }
+    });
   });
   
   // --------------------------------------------
@@ -573,79 +798,73 @@ io.on('connection', (socket) => {
     
     console.log(`${user.name} invited ${userName} to note ${noteId}, users: ${realUsers.length}, name: ${note.name}`);
     
-    // Find invited user's socket
-    let invitedSocketId = null;
-    state.users.forEach((u, sid) => {
-      if (u.name === userName) {
-        invitedSocketId = sid;
+    // Send note AND all children to invited user (all their sessions)
+    let inviteeName = note.name;
+    if (realUsers.length === 2) {
+      // 2 people: invitee sees inviter's name
+      inviteeName = user.name;
+    } else {
+      // 3+ people: show comma list excluding themselves
+      const theirOthers = realUsers.filter(u => u !== userName);
+      inviteeName = theirOthers.slice(0, 3).join(', ') + (theirOthers.length > 3 ? '...' : '');
+    }
+    
+    // Check if invitee has access to the parent
+    // If not, this note should appear top-level for them
+    let noteForInvitee = { ...note, name: inviteeName };
+    if (note.parent) {
+      const parent = state.notes[note.parent];
+      if (!parent || !parent.users || !parent.users.includes(userName)) {
+        // Invitee doesn't have access to parent - make this top-level for them
+        noteForInvitee.parent = null;
+      }
+    }
+    
+    // Send the main note to all invitee sessions
+    emitToUser(userName, 'noteInvite', {
+      note: noteForInvitee,
+      fromUser: user.name
+    });
+    
+    // Send all nested children to all invitee sessions
+    const allNotes = collectNoteTree(noteId);
+    allNotes.forEach(n => {
+      if (n.id !== noteId) { // Skip the parent, already sent
+        emitToUser(userName, 'noteInvite', {
+          note: n,
+          fromUser: user.name
+        });
       }
     });
     
-    // Send note AND all children to invited user
-    if (invitedSocketId) {
-      let inviteeName = note.name;
-      if (realUsers.length === 2) {
-        // 2 people: invitee sees inviter's name
-        inviteeName = user.name;
-      } else {
-        // 3+ people: show comma list excluding themselves
-        const theirOthers = realUsers.filter(u => u !== userName);
-        inviteeName = theirOthers.slice(0, 3).join(', ') + (theirOthers.length > 3 ? '...' : '');
-      }
-      
-      // Check if invitee has access to the parent
-      // If not, this note should appear top-level for them
-      let noteForInvitee = { ...note, name: inviteeName };
-      if (note.parent) {
-        const parent = state.notes[note.parent];
-        if (!parent || !parent.users || !parent.users.includes(userName)) {
-          // Invitee doesn't have access to parent - make this top-level for them
-          noteForInvitee.parent = null;
-        }
-      }
-      
-      // Send the main note
-      io.to(invitedSocketId).emit('noteInvite', {
-        note: noteForInvitee,
-        fromUser: user.name
-      });
-      
-      // Send all nested children
-      const allNotes = collectNoteTree(noteId);
-      allNotes.forEach(n => {
-        if (n.id !== noteId) { // Skip the parent, already sent
-          io.to(invitedSocketId).emit('noteInvite', {
-            note: n,
-            fromUser: user.name
-          });
-        }
-      });
-    }
-    
-    // Notify all users in note about changes
+    // Notify all users in note about changes (by unique username)
+    const notifiedUsers = new Set();
     const userIds = getUsersInNote(noteId);
     userIds.forEach(id => {
-      if (id !== invitedSocketId) { // Don't double-send to invitee
-        const viewingUser = state.users.get(id);
-        let viewName = note.name;
-        
-        if (realUsers.length === 2 && viewingUser) {
-          // 2 people: each sees the other's name
-          const otherPerson = realUsers.find(u => u !== viewingUser.name);
-          if (otherPerson) viewName = otherPerson;
-        } else if (realUsers.length > 2 && viewingUser) {
-          // 3+ people: each sees comma list excluding themselves
-          const theirOthers = realUsers.filter(u => u !== viewingUser.name);
-          viewName = theirOthers.slice(0, 3).join(', ') + (theirOthers.length > 3 ? '...' : '');
-        }
-        
-        io.to(id).emit('noteTypeChanged', {
-          noteId: noteId,
-          type: note.type,
-          name: viewName,
-          users: note.users
-        });
+      const viewingUser = state.users.get(id);
+      if (!viewingUser || notifiedUsers.has(viewingUser.name.toLowerCase())) return;
+      if (viewingUser.name === userName) return; // Don't double-send to invitee
+      
+      notifiedUsers.add(viewingUser.name.toLowerCase());
+      
+      let viewName = note.name;
+      
+      if (realUsers.length === 2) {
+        // 2 people: each sees the other's name
+        const otherPerson = realUsers.find(u => u !== viewingUser.name);
+        if (otherPerson) viewName = otherPerson;
+      } else if (realUsers.length > 2) {
+        // 3+ people: each sees comma list excluding themselves
+        const theirOthers = realUsers.filter(u => u !== viewingUser.name);
+        viewName = theirOthers.slice(0, 3).join(', ') + (theirOthers.length > 3 ? '...' : '');
       }
+      
+      emitToUser(viewingUser.name, 'noteTypeChanged', {
+        noteId: noteId,
+        type: note.type,
+        name: viewName,
+        users: note.users
+      });
     });
   });
   
@@ -743,27 +962,24 @@ io.on('connection', (socket) => {
           dm: sharerDm 
         });
         
-        // Send to invitee
-        const recipient = Array.from(state.users.values()).find(u => u.name === inviteeName);
-        if (recipient) {
-          const recipientDm = { ...existingDM, name: user.name };
-          io.to(recipient.id).emit('noteShared', { 
-            note: note, 
-            dm: recipientDm,
-            fromUser: user.name
-          });
-          
-          // Send children
-          const allNotes = collectNoteTree(noteId);
-          allNotes.forEach(n => {
-            if (n.id !== noteId) {
-              io.to(recipient.id).emit('noteInvite', {
-                note: n,
-                fromUser: user.name
-              });
-            }
-          });
-        }
+        // Send to invitee (all their sessions)
+        const recipientDm = { ...existingDM, name: user.name };
+        emitToUser(inviteeName, 'noteShared', { 
+          note: note, 
+          dm: recipientDm,
+          fromUser: user.name
+        });
+        
+        // Send children
+        const allNotes = collectNoteTree(noteId);
+        allNotes.forEach(n => {
+          if (n.id !== noteId) {
+            emitToUser(inviteeName, 'noteInvite', {
+              note: n,
+              fromUser: user.name
+            });
+          }
+        });
         return;
       }
       
@@ -790,25 +1006,22 @@ io.on('connection', (socket) => {
         note: { ...note, name: inviteeName }
       });
       
-      // Send to invitee
-      const recipient = Array.from(state.users.values()).find(u => u.name === inviteeName);
-      if (recipient) {
-        io.to(recipient.id).emit('noteInvite', {
-          note: { ...note, name: user.name },
-          fromUser: user.name
-        });
-        
-        // Send children
-        const allNotes = collectNoteTree(noteId);
-        allNotes.forEach(n => {
-          if (n.id !== noteId) {
-            io.to(recipient.id).emit('noteInvite', {
-              note: n,
-              fromUser: user.name
-            });
-          }
-        });
-      }
+      // Send to invitee (all their sessions)
+      emitToUser(inviteeName, 'noteInvite', {
+        note: { ...note, name: user.name },
+        fromUser: user.name
+      });
+      
+      // Send children
+      const allNotesForDM = collectNoteTree(noteId);
+      allNotesForDM.forEach(n => {
+        if (n.id !== noteId) {
+          emitToUser(inviteeName, 'noteInvite', {
+            note: n,
+            fromUser: user.name
+          });
+        }
+      });
       return;
     }
     
@@ -855,12 +1068,9 @@ io.on('connection', (socket) => {
     sendToInvitees(note, noteId, userNames, realUsers, user);
   });
   
-  // Helper: Send note to invitees
+  // Helper: Send note to invitees (all their sessions)
   function sendToInvitees(note, noteId, userNames, realUsers, inviter) {
     userNames.forEach(userName => {
-      const recipient = Array.from(state.users.values()).find(u => u.name === userName);
-      if (!recipient) return;
-      
       // Calculate name for this invitee
       const theirOthers = realUsers.filter(u => u !== userName);
       const theirName = theirOthers.length === 1
@@ -876,7 +1086,7 @@ io.on('connection', (socket) => {
         }
       }
       
-      io.to(recipient.id).emit('noteInvite', {
+      emitToUser(userName, 'noteInvite', {
         note: noteForInvitee,
         fromUser: inviter.name
       });
@@ -885,7 +1095,7 @@ io.on('connection', (socket) => {
       const allNotes = collectNoteTree(noteId);
       allNotes.forEach(n => {
         if (n.id !== noteId) {
-          io.to(recipient.id).emit('noteInvite', {
+          emitToUser(userName, 'noteInvite', {
             note: n,
             fromUser: inviter.name
           });
@@ -894,19 +1104,16 @@ io.on('connection', (socket) => {
     });
   }
   
-  // Helper: Notify existing users of changes
+  // Helper: Notify existing users of changes (all their sessions)
   function notifyExistingUsers(note, noteId, newUserNames, realUsers, inviter) {
     const existingUserNames = note.users.filter(u => u !== inviter.name && !newUserNames.includes(u));
     existingUserNames.forEach(userName => {
-      const existingUser = Array.from(state.users.values()).find(u => u.name === userName);
-      if (!existingUser) return;
-      
       const theirOthers = realUsers.filter(u => u !== userName);
       const theirName = theirOthers.length === 1
         ? theirOthers[0]
         : theirOthers.slice(0, 3).join(', ') + (theirOthers.length > 3 ? '...' : '');
       
-      io.to(existingUser.id).emit('noteTypeChanged', {
+      emitToUser(userName, 'noteTypeChanged', {
         noteId: noteId,
         type: note.type,
         name: theirName,
@@ -956,11 +1163,8 @@ io.on('connection', (socket) => {
       note.threads[data.replyTo].push(messageId);
     }
     
-    // Broadcast only to users who have access to this note
-    const userIds = getUsersInNote(noteId);
-    userIds.forEach(id => {
-      io.to(id).emit('message', message);
-    });
+    // Broadcast to all users who have access to this note (handles multi-session)
+    broadcastToNote(noteId, 'message', message);
     
     console.log(`Message in ${noteId} from ${user.name}: ${data.text.substring(0, 50)}`);
     
@@ -1012,11 +1216,8 @@ io.on('connection', (socket) => {
     
     state.artifacts[artifactId] = artifact;
     
-    // Broadcast to all clients in this note
-    const userIds = getUsersInNote(noteId);
-    userIds.forEach(id => {
-      io.to(id).emit('artifactCreated', artifact);
-    });
+    // Broadcast to all clients in this note (handles multi-session)
+    broadcastToNote(noteId, 'artifactCreated', artifact);
     
     // Also post a message about it (include comment if provided)
     const messageId = 'msg-' + (++messageIdCounter);
@@ -1037,9 +1238,7 @@ io.on('connection', (socket) => {
       note.messages.push(message);
     }
     
-    userIds.forEach(id => {
-      io.to(id).emit('message', message);
-    });
+    broadcastToNote(noteId, 'message', message);
   });
   
   // --------------------------------------------
@@ -1070,11 +1269,8 @@ io.on('connection', (socket) => {
       artifact.contributors.push(user.name);
     }
     
-    // Broadcast update to users in note
-    const userIds = getUsersInNote(noteId);
-    userIds.forEach(id => {
-      io.to(id).emit('artifactUpdated', artifact);
-    });
+    // Broadcast update to users in note (handles multi-session)
+    broadcastToNote(noteId, 'artifactUpdated', artifact);
     
     // Post message about edit
     const messageId = 'msg-' + (++messageIdCounter);
@@ -1094,13 +1290,495 @@ io.on('connection', (socket) => {
       note.messages.push(message);
     }
     
-    userIds.forEach(id => {
-      io.to(id).emit('message', message);
-    });
+    broadcastToNote(noteId, 'message', message);
   });
   
   // --------------------------------------------
-  // WALLET - SEND NOCK
+  // LIGHT BIKE GAME
+  // --------------------------------------------
+  
+  socket.on('lightbikeSelectPlayer', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    
+    const { artifactId, playerNum, botName, owner } = data;
+    
+    // Initialize game state if needed
+    if (!state.lightbikeGames) state.lightbikeGames = {};
+    if (!state.lightbikeGames[artifactId]) {
+      state.lightbikeGames[artifactId] = {
+        player1: null,
+        player2: null,
+        state: 'waiting'
+      };
+    }
+    
+    const game = state.lightbikeGames[artifactId];
+    
+    // Check if slot is already taken
+    if (playerNum === 1 && game.player1) return;
+    if (playerNum === 2 && game.player2) return;
+    
+    // Check if it's a dummy bot
+    if (botName.startsWith('dummy:')) {
+      const dummyType = botName.split(':')[1];
+      const dummyNames = {
+        'random': '🤖 Random',
+        'clockwise': '🤖 Clockwise',
+        'survivor': '🤖 Survivor'
+      };
+      
+      if (playerNum === 1) {
+        game.player1 = { bot: dummyNames[dummyType] || botName, owner: 'system', isDummy: true, dummyType: dummyType };
+      } else {
+        game.player2 = { bot: dummyNames[dummyType] || botName, owner: 'system', isDummy: true, dummyType: dummyType };
+      }
+    } else {
+      // Verify the bot belongs to this user
+      const bot = Object.values(state.bots).find(b => b.name === botName && b.owner === owner);
+      if (!bot) return;
+      
+      // Assign player
+      if (playerNum === 1) {
+        game.player1 = { bot: botName, owner: owner, webhook: bot.webhookUrl };
+      } else {
+        game.player2 = { bot: botName, owner: owner, webhook: bot.webhookUrl };
+      }
+    }
+    
+    // Update state
+    if (game.player1 && game.player2) {
+      game.state = 'ready';
+    }
+    
+    // Get note for this artifact to broadcast
+    const artifact = state.artifacts[artifactId];
+    if (!artifact) return;
+    
+    const noteId = artifact.noteId || 'cover';
+    
+    // Broadcast game state update (handles multi-session)
+    broadcastToNote(noteId, 'lightbikeGameUpdate', { artifactId, game });
+  });
+  
+  socket.on('lightbikeStart', async (data) => {
+    const { artifactId } = data;
+    
+    if (!state.lightbikeGames || !state.lightbikeGames[artifactId]) return;
+    
+    const game = state.lightbikeGames[artifactId];
+    if (game.state !== 'ready') return;
+    
+    // Initialize game
+    game.state = 'running';
+    game.tick = 0;
+    game.pos1 = { x: 12, y: 25, direction: 'east' };
+    game.pos2 = { x: 37, y: 25, direction: 'west' };
+    game.trail1 = [{ x: 12, y: 25 }];
+    game.trail2 = [{ x: 37, y: 25 }];
+    game.winner = null;
+    
+    // Get note for this artifact
+    const artifact = state.artifacts[artifactId];
+    const noteId = artifact ? artifact.noteId : 'cover';
+    
+    // Send initial briefing to LLM bots
+    const briefingP1 = `You are playing LIGHT BIKE (like Tron).
+
+RULES:
+- 50x50 grid arena (coordinates 0-49)
+- You leave a trail behind you that kills on contact
+- Hit a wall or any trail (yours or enemy's) = you die
+- Last one alive wins
+
+CONTROLS - respond with ONLY one of these words:
+- LEFT = turn 90° counterclockwise
+- RIGHT = turn 90° clockwise
+- STRAIGHT = keep current direction
+
+DIRECTIONS:
+- If facing EAST and turn LEFT, you face NORTH
+- If facing EAST and turn RIGHT, you face SOUTH
+- NORTH = y decreases, SOUTH = y increases, EAST = x increases, WEST = x decreases
+
+You are PLAYER 1 (amber). You start at position (12, 25) facing EAST.
+Your opponent starts at (37, 25) facing WEST.
+
+Each turn I will tell you positions. Respond with ONLY: LEFT, RIGHT, or STRAIGHT
+
+Game starting now!`;
+
+    const briefingP2 = `You are playing LIGHT BIKE (like Tron).
+
+RULES:
+- 50x50 grid arena (coordinates 0-49)
+- You leave a trail behind you that kills on contact
+- Hit a wall or any trail (yours or enemy's) = you die
+- Last one alive wins
+
+CONTROLS - respond with ONLY one of these words:
+- LEFT = turn 90° counterclockwise
+- RIGHT = turn 90° clockwise
+- STRAIGHT = keep current direction
+
+DIRECTIONS:
+- If facing WEST and turn LEFT, you face SOUTH
+- If facing WEST and turn RIGHT, you face NORTH
+- NORTH = y decreases, SOUTH = y increases, EAST = x increases, WEST = x decreases
+
+You are PLAYER 2 (blue). You start at position (37, 25) facing WEST.
+Your opponent starts at (12, 25) facing EAST.
+
+Each turn I will tell you positions. Respond with ONLY: LEFT, RIGHT, or STRAIGHT
+
+Game starting now!`;
+
+    // Send briefings (don't wait for response)
+    if (!game.player1.isDummy && game.player1.webhook) {
+      try {
+        await fetch(game.player1.webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: { text: "@" + game.player1.bot + " " + briefingP1 }, botName: game.player1.bot })
+        });
+      } catch (e) {
+        console.log('Light Bike: P1 briefing error', e.message);
+      }
+    }
+    
+    if (!game.player2.isDummy && game.player2.webhook) {
+      try {
+        await fetch(game.player2.webhook, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: { text: "@" + game.player2.bot + " " + briefingP2 }, botName: game.player2.bot })
+        });
+      } catch (e) {
+        console.log('Light Bike: P2 briefing error', e.message);
+      }
+    }
+    
+    // Broadcast initial state (handles multi-session)
+    broadcastToNote(noteId, 'lightbikeTick', { artifactId, gameState: game });
+    
+    // Run game loop - 10 seconds per tick
+    const gameLoop = setInterval(async () => {
+      if (game.state !== 'running') {
+        clearInterval(gameLoop);
+        return;
+      }
+      
+      game.tick++;
+      
+      // Build tick prompt for LLM bots
+      const tickPromptP1 = `TICK ${game.tick}:
+You: (${game.pos1.x}, ${game.pos1.y}) facing ${game.pos1.direction.toUpperCase()}
+Enemy: (${game.pos2.x}, ${game.pos2.y}) facing ${game.pos2.direction.toUpperCase()}
+Your move? (LEFT, RIGHT, or STRAIGHT)`;
+
+      const tickPromptP2 = `TICK ${game.tick}:
+You: (${game.pos2.x}, ${game.pos2.y}) facing ${game.pos2.direction.toUpperCase()}
+Enemy: (${game.pos1.x}, ${game.pos1.y}) facing ${game.pos1.direction.toUpperCase()}
+Your move? (LEFT, RIGHT, or STRAIGHT)`;
+
+      // Query player 1
+      let move1 = 'STRAIGHT';
+      if (game.player1.isDummy) {
+        move1 = getDummyBotMove(game.player1.dummyType, game.pos1, game.pos2, game.trail1, game.trail2);
+      } else {
+        try {
+          const resp1 = await fetch(game.player1.webhook, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: { text: "@" + game.player1.bot + " " + tickPromptP1 }, botName: game.player1.bot })
+          });
+          const data1 = await resp1.json();
+          // Parse response - look for LEFT, RIGHT, or STRAIGHT in the response
+          const responseText = (data1.reply || data1.response || data1.text || data1.message || '').toUpperCase();
+          if (responseText.includes('LEFT')) {
+            move1 = 'LEFT';
+          } else if (responseText.includes('RIGHT')) {
+            move1 = 'RIGHT';
+          } else {
+            move1 = 'STRAIGHT';
+          }
+          console.log(`Light Bike P1 (${game.player1.bot}): "${responseText}" -> ${move1}`);
+        } catch (e) {
+          console.log('Light Bike: P1 bot error', e.message);
+        }
+      }
+      
+      // Query player 2
+      let move2 = 'STRAIGHT';
+      if (game.player2.isDummy) {
+        move2 = getDummyBotMove(game.player2.dummyType, game.pos2, game.pos1, game.trail2, game.trail1);
+      } else {
+        try {
+          const resp2 = await fetch(game.player2.webhook, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: { text: "@" + game.player2.bot + " " + tickPromptP2 }, botName: game.player2.bot })
+          });
+          const data2 = await resp2.json();
+          // Parse response - look for LEFT, RIGHT, or STRAIGHT in the response
+          const responseText = (data2.reply || data2.response || data2.text || data2.message || '').toUpperCase();
+          if (responseText.includes('LEFT')) {
+            move2 = 'LEFT';
+          } else if (responseText.includes('RIGHT')) {
+            move2 = 'RIGHT';
+          } else {
+            move2 = 'STRAIGHT';
+          }
+          console.log(`Light Bike P2 (${game.player2.bot}): "${responseText}" -> ${move2}`);
+        } catch (e) {
+          console.log('Light Bike: P2 bot error', e.message);
+        }
+      }
+      
+      // Apply moves
+      game.pos1 = applyLightBikeMove(game.pos1, move1);
+      game.pos2 = applyLightBikeMove(game.pos2, move2);
+      
+      // Add to trails
+      game.trail1.push({ x: game.pos1.x, y: game.pos1.y });
+      game.trail2.push({ x: game.pos2.x, y: game.pos2.y });
+      
+      // Check collisions
+      const p1Dead = checkLightBikeCollision(game.pos1, game.trail1, game.trail2);
+      const p2Dead = checkLightBikeCollision(game.pos2, game.trail2, game.trail1);
+      
+      if (p1Dead && p2Dead) {
+        game.state = 'finished';
+        game.winner = null; // Draw
+      } else if (p1Dead) {
+        game.state = 'finished';
+        game.winner = game.player2.bot;
+      } else if (p2Dead) {
+        game.state = 'finished';
+        game.winner = game.player1.bot;
+      }
+      
+      // Max ticks safety (at 10sec/tick, 100 ticks = ~16 minutes max)
+      if (game.tick > 100) {
+        game.state = 'finished';
+        game.winner = null;
+      }
+      
+      // Broadcast tick to all users in note (handles multi-session)
+      broadcastToNote(noteId, 'lightbikeTick', { artifactId, gameState: game });
+      
+      if (game.state === 'finished') {
+        clearInterval(gameLoop);
+      }
+    }, 10000); // 10 seconds per tick
+  });
+  
+  // --------------------------------------------
+  // WALLET - REGISTER ADDRESS
+  // --------------------------------------------
+  socket.on('registerWalletAddress', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    
+    const { address } = data;
+    if (!address) return;
+    
+    state.walletAddresses[user.name.toLowerCase()] = address;
+    console.log(`Wallet address registered: ${user.name} → ${address}`);
+    
+    // Confirm to client
+    socket.emit('walletAddressRegistered', { success: true, address });
+  });
+  
+  // --------------------------------------------
+  // WALLET - NOCK SEND CONFIRMED (on-chain)
+  // --------------------------------------------
+  socket.on('nockSendConfirmed', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    
+    const { to, amount, txHash, replyToMessageId } = data;
+    console.log(`nockSendConfirmed: ${user.name} sent ${amount} NOCK to ${to}, tx: ${txHash}`);
+    
+    const timeStr = getTimeString();
+    const timestamp = Date.now();
+    
+    // Initialize wallets for both users
+    const senderWallet = initWallet(user.name);
+    
+    // Log transaction for sender (sent - red)
+    senderWallet.transactions.unshift({
+      type: 'sent',
+      to: to,
+      amount: amount,
+      txid: txHash,
+      time: timeStr,
+      timestamp: timestamp
+    });
+    // Keep last 50
+    if (senderWallet.transactions.length > 50) senderWallet.transactions.length = 50;
+    
+    // Send updated wallet to sender
+    const senderSockets = getSocketsForUser(user.name);
+    senderSockets.forEach(sid => {
+      io.to(sid).emit('walletUpdate', senderWallet);
+    });
+    
+    // Check if recipient is a GRIMOIRE user (not just an address)
+    const recipientIsUser = !to.startsWith('0x');
+    
+    if (recipientIsUser) {
+      // Log transaction for recipient (received - green)
+      const recipientWallet = initWallet(to);
+      recipientWallet.transactions.unshift({
+        type: 'received',
+        from: user.name,
+        amount: amount,
+        txid: txHash,
+        time: timeStr,
+        timestamp: timestamp
+      });
+      if (recipientWallet.transactions.length > 50) recipientWallet.transactions.length = 50;
+      
+      // Send updated wallet to recipient
+      const recipientSockets = getSocketsForUser(to);
+      recipientSockets.forEach(sid => {
+        io.to(sid).emit('walletUpdate', recipientWallet);
+      });
+    }
+    
+    // Now handle the message/DM
+    if (replyToMessageId) {
+      // REPLY SEND - post as reply in current note
+      const noteId = user.currentNote || 'cover';
+      const note = state.notes[noteId];
+      
+      const messageId = 'msg-' + (++messageIdCounter);
+      const message = {
+        id: messageId,
+        noteId: noteId,
+        author: user.name,
+        authorType: user.type,
+        text: `sent ${amount.toFixed(2)} $NOCK`,
+        time: timeStr,
+        timestamp: timestamp,
+        isNockSend: true,
+        txHash: txHash,
+        replyTo: replyToMessageId
+      };
+      
+      if (note) {
+        note.messages.push(message);
+        if (!note.threads) note.threads = {};
+        if (!note.threads[replyToMessageId]) {
+          note.threads[replyToMessageId] = [];
+        }
+        note.threads[replyToMessageId].push(messageId);
+      }
+      
+      broadcastToNote(noteId, 'message', message);
+      
+    } else if (recipientIsUser) {
+      // WALLET SEND to GRIMOIRE user - find existing DM or create new one
+      
+      // Search for existing DM between these two users
+      let dm = null;
+      for (const noteId in state.notes) {
+        const note = state.notes[noteId];
+        if (note.type === 'dm' && note.users && note.users.length === 2) {
+          const hasUser = note.users.some(u => u.toLowerCase() === user.name.toLowerCase());
+          const hasRecipient = note.users.some(u => u.toLowerCase() === to.toLowerCase());
+          if (hasUser && hasRecipient) {
+            dm = note;
+            break;
+          }
+        }
+      }
+      
+      let dmCreated = false;
+      
+      // Create DM only if none exists
+      if (!dm) {
+        dmCreated = true;
+        const participants = [user.name, to].sort();
+        const dmId = 'dm-' + participants.map(p => p.toLowerCase()).join('-');
+        dm = {
+          id: dmId,
+          name: to,  // Will be personalized per-user when sent
+          type: 'dm',
+          creator: user.name,
+          users: participants,
+          messages: [],
+          threads: {},
+          children: [],
+          parent: null,
+          visibility: 'private',
+          writable: true
+        };
+        state.notes[dmId] = dm;
+        console.log(`Created DM ${dmId} for wallet send between ${user.name} and ${to}`);
+      }
+      
+      const messageId = 'msg-' + (++messageIdCounter);
+      const message = {
+        id: messageId,
+        noteId: dm.id,
+        author: user.name,
+        authorType: user.type,
+        text: `sent ${amount.toFixed(2)} $NOCK`,
+        time: timeStr,
+        timestamp: timestamp,
+        isNockSend: true,
+        txHash: txHash
+      };
+      
+      dm.messages.push(message);
+      
+      // If DM was just created, send noteCreated to both users
+      if (dmCreated) {
+        // Send to sender with recipient's name as DM name
+        const senderDm = { ...dm, name: to };
+        senderSockets.forEach(sid => {
+          io.to(sid).emit('noteCreated', { note: senderDm });
+        });
+        
+        // Send to recipient with sender's name as DM name
+        const recipientSockets = getSocketsForUser(to);
+        const recipientDm = { ...dm, name: user.name };
+        recipientSockets.forEach(sid => {
+          io.to(sid).emit('noteCreated', { note: recipientDm });
+        });
+      }
+      
+      // Broadcast message to both participants
+      broadcastToNote(dm.id, 'message', message);
+      
+      // Also notify recipient about the DM
+      const recipientSockets = getSocketsForUser(to);
+      recipientSockets.forEach(sid => {
+        io.to(sid).emit('dmNotification', { 
+          dmId: dm.id, 
+          from: user.name, 
+          preview: `sent ${amount.toFixed(2)} $NOCK` 
+        });
+      });
+    }
+    // If wallet send to raw address (not a user), no message is posted
+  });
+  
+  // --------------------------------------------
+  // WALLET - GET WALLET
+  // --------------------------------------------
+  socket.on('getWallet', () => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    
+    const wallet = initWallet(user.name);
+    socket.emit('walletUpdate', wallet);
+  });
+  
+  // --------------------------------------------
+  // WALLET - SEND NOCK (fake/legacy)
   // --------------------------------------------
   socket.on('sendNock', (data) => {
     const user = state.users.get(socket.id);
@@ -1112,7 +1790,7 @@ io.on('connection', (socket) => {
     const { to, amount, replyToMessageId } = data;
     console.log(`sendNock: ${user.name} sending ${amount} to ${to}`);
     
-    const wallet = state.wallets[socket.id];
+    const wallet = state.wallets[user.name];
     
     if (!wallet || wallet.balance < amount) {
       console.log('sendNock: Insufficient balance or no wallet');
@@ -1132,28 +1810,23 @@ io.on('connection', (socket) => {
     });
     console.log(`sendNock: Deducted from ${user.name}, new balance: ${wallet.balance}`);
     
-    // Find recipient and add to their wallet
-    const recipient = Array.from(state.users.values()).find(u => u.name === to);
-    console.log('sendNock: Looking for recipient:', to, 'Found:', recipient ? recipient.name : 'NOT FOUND');
+    // Add to recipient's wallet (by username)
+    const recipientWallet = initWallet(to);
+    recipientWallet.balance += amount;
+    recipientWallet.transactions.push({
+      type: 'received',
+      who: user.name,
+      amount,
+      time: timeStr
+    });
+    console.log(`sendNock: Added to ${to}, new balance: ${recipientWallet.balance}`);
     
-    if (recipient) {
-      const recipientWallet = initWallet(recipient.id);
-      recipientWallet.balance += amount;
-      recipientWallet.transactions.push({
-        type: 'received',
-        who: user.name,
-        amount,
-        time: timeStr
-      });
-      console.log(`sendNock: Added to ${recipient.name}, new balance: ${recipientWallet.balance}`);
-      
-      // Notify recipient of wallet update
-      io.to(recipient.id).emit('walletUpdate', recipientWallet);
-    }
+    // Notify recipient of wallet update (all their sessions)
+    emitToUser(to, 'walletUpdate', recipientWallet);
     
-    // Notify sender of wallet update
-    socket.emit('walletUpdate', wallet);
-    console.log('sendNock: Sent walletUpdate to sender');
+    // Notify sender of wallet update (all their sessions)
+    emitToUser(user.name, 'walletUpdate', wallet);
+    console.log('sendNock: Sent walletUpdate to both parties');
     
     // If this is a reply (hover SEND), keep in current note and thread
     if (replyToMessageId) {
@@ -1182,10 +1855,7 @@ io.on('connection', (socket) => {
         note.threads[replyToMessageId].push(messageId);
       }
       
-      const userIds = getUsersInNote(noteId);
-      userIds.forEach(id => {
-        io.to(id).emit('message', message);
-      });
+      broadcastToNote(noteId, 'message', message);
     } else {
       // Wallet modal SEND - goes to 2-person DM only (not groups)
       let dmNote = null;
@@ -1222,14 +1892,12 @@ io.on('connection', (socket) => {
         };
         state.notes[dmNoteId] = dmNote;
         
-        // Notify sender about the new DM
-        socket.emit('noteInvite', { note: dmNote, fromUser: to });
+        // Notify sender about the new DM (all their sessions)
+        emitToUser(user.name, 'noteInvite', { note: dmNote, fromUser: to });
         
-        // Notify recipient about the new DM (with their perspective on naming)
-        if (recipient) {
-          const recipientNote = { ...dmNote, name: user.name };
-          io.to(recipient.id).emit('noteInvite', { note: recipientNote, fromUser: user.name });
-        }
+        // Notify recipient about the new DM (all their sessions)
+        const recipientNote = { ...dmNote, name: user.name };
+        emitToUser(to, 'noteInvite', { note: recipientNote, fromUser: user.name });
       }
       
       // Post message to DM
@@ -1247,10 +1915,14 @@ io.on('connection', (socket) => {
       
       dmNote.messages.push(message);
       
-      // Send to both users in the DM
+      // Send to all users in the DM (all their sessions, deduped)
+      const notifiedUsers = new Set();
       const userIds = getUsersInNote(dmNoteId);
       userIds.forEach(id => {
-        io.to(id).emit('message', message);
+        const viewingUser = state.users.get(id);
+        if (!viewingUser || notifiedUsers.has(viewingUser.name.toLowerCase())) return;
+        notifiedUsers.add(viewingUser.name.toLowerCase());
+        emitToUser(viewingUser.name, 'message', message);
       });
     }
   });
@@ -1300,14 +1972,12 @@ io.on('connection', (socket) => {
       };
       state.notes[dmNoteId] = dmNote;
       
-      // Notify both users about the new DM
-      socket.emit('noteInvite', { note: dmNote, fromUser: from });
+      // Notify requester about the new DM
+      emitToUser(user.name, 'noteInvite', { note: dmNote, fromUser: from });
       
-      const recipient = Array.from(state.users.values()).find(u => u.name === from);
-      if (recipient) {
-        const recipientNote = { ...dmNote, name: user.name }; // Named after requester for recipient
-        io.to(recipient.id).emit('noteInvite', { note: recipientNote, fromUser: user.name });
-      }
+      // Notify recipient about the new DM (all their sessions)
+      const recipientNote = { ...dmNote, name: user.name }; // Named after requester for recipient
+      emitToUser(from, 'noteInvite', { note: recipientNote, fromUser: user.name });
     }
     
     const messageId = 'msg-' + (++messageIdCounter);
@@ -1324,10 +1994,14 @@ io.on('connection', (socket) => {
     
     dmNote.messages.push(message);
     
-    // Send to both users in the DM
+    // Send to all users in the DM (all their sessions)
+    const notifiedUsers = new Set();
     const userIds = getUsersInNote(dmNoteId);
     userIds.forEach(id => {
-      io.to(id).emit('message', message);
+      const viewingUser = state.users.get(id);
+      if (!viewingUser || notifiedUsers.has(viewingUser.name.toLowerCase())) return;
+      notifiedUsers.add(viewingUser.name.toLowerCase());
+      emitToUser(viewingUser.name, 'message', message);
     });
   });
   
@@ -1359,8 +2033,27 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const user = state.users.get(socket.id);
     if (user) {
-      console.log(`User left: ${user.name}`);
-      socket.broadcast.emit('userLeft', { name: user.name });
+      const nameLower = user.name.toLowerCase();
+      
+      // Remove this socket from user's sessions
+      const sessions = state.userSessions.get(nameLower);
+      if (sessions) {
+        sessions.delete(socket.id);
+        
+        // If no more sessions, user has fully disconnected
+        if (sessions.size === 0) {
+          state.userSessions.delete(nameLower);
+          console.log(`User left: ${user.name} (all sessions closed)`);
+          socket.broadcast.emit('userLeft', { name: user.name });
+          
+          // Free up the username (only for non-urbit users)
+          if (user.type !== 'urbit') {
+            state.activeUsernames.delete(nameLower);
+          }
+        } else {
+          console.log(`User session closed: ${user.name} (${sessions.size} session(s) remaining)`);
+        }
+      }
     }
     
     state.users.delete(socket.id);
@@ -1380,12 +2073,8 @@ async function triggerWebhook(bot, message) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'mention',
         message: message,
-        botName: bot.name,
-        // Include context the bot might need
-        artifacts: state.artifacts,
-        users: Array.from(state.users.values()).map(u => ({ name: u.name, type: u.type }))
+        botName: bot.name
       })
     });
     
@@ -1549,13 +2238,8 @@ async function executeAction(bot, action, triggerMessage) {
     }
     
     case 'sendNock': {
-      const recipient = Array.from(state.users.values()).find(u => u.name === action.to);
-      if (!recipient) {
-        console.log(`Bot ${bot.name} tried to send NOCK to non-existent user: ${action.to}`);
-        break;
-      }
-      
-      const recipientWallet = initWallet(recipient.id);
+      // Init wallet by username (recipient might not be online)
+      const recipientWallet = initWallet(action.to);
       recipientWallet.balance += action.amount;
       recipientWallet.transactions.push({
         type: 'received',
@@ -1564,7 +2248,8 @@ async function executeAction(bot, action, triggerMessage) {
         time: timeStr
       });
       
-      io.to(recipient.id).emit('walletUpdate', recipientWallet);
+      // Notify recipient (all their sessions, if online)
+      emitToUser(action.to, 'walletUpdate', recipientWallet);
       
       // Post message about transfer
       const messageId = 'msg-' + (++messageIdCounter);
@@ -1580,9 +2265,15 @@ async function executeAction(bot, action, triggerMessage) {
       };
       
       if (note) note.messages.push(msg);
+      
+      // Send to all users in note (deduped)
+      const notifiedUsers = new Set();
       const userIds = getUsersInNote(noteId);
       userIds.forEach(id => {
-        io.to(id).emit('message', msg);
+        const viewingUser = state.users.get(id);
+        if (!viewingUser || notifiedUsers.has(viewingUser.name.toLowerCase())) return;
+        notifiedUsers.add(viewingUser.name.toLowerCase());
+        emitToUser(viewingUser.name, 'message', msg);
       });
       
       console.log(`Bot ${bot.name} sent ${action.amount} NOCK to ${action.to}`);
