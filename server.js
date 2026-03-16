@@ -3,6 +3,8 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
+const crypto = require('crypto');
 
 const app = express();
 const server = createServer(app);
@@ -14,8 +16,36 @@ const io = new Server(server, {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ============================================
+// FILE UPLOAD
+// ============================================
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: path.join(__dirname, 'public/uploads'),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const unique = crypto.randomBytes(8).toString('hex');
+      cb(null, unique + ext);
+    }
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB
+});
+
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file received' });
+  }
+  res.json({
+    success: true,
+    url: '/uploads/' + req.file.filename,
+    originalName: req.file.originalname,
+    mimetype: req.file.mimetype
+  });
+});
 
 // ============================================
 // NOCKBLOCKS API PROXY
@@ -1293,6 +1323,85 @@ io.on('connection', (socket) => {
     broadcastToNote(noteId, 'message', message);
   });
   
+  // --------------------------------------------
+  // DELETE ARTIFACT
+  // --------------------------------------------
+  socket.on('deleteArtifact', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    const artifact = state.artifacts[data.artifactId];
+    if (!artifact) return;
+    const noteId = artifact.noteId;
+    // Remove artifact
+    delete state.artifacts[data.artifactId];
+    // Remove associated messages from note
+    const note = state.notes[noteId];
+    if (note) {
+      note.messages = note.messages.filter(m => m.artifactId !== data.artifactId);
+    }
+    broadcastToNote(noteId, 'artifactDeleted', { artifactId: data.artifactId });
+  });
+
+  // --------------------------------------------
+  // CANVAS ARTIFACT
+  // --------------------------------------------
+
+  // Broadcast new drawn path or placed image to all in note
+  socket.on('canvasObjectAdded', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    const noteId = user.currentNote || 'cover';
+    broadcastToNote(noteId, 'canvasObjectAdded', data);
+  });
+
+  // Broadcast moved/resized object to all in note
+  socket.on('canvasObjectModified', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    const noteId = user.currentNote || 'cover';
+    broadcastToNote(noteId, 'canvasObjectModified', data);
+  });
+
+  // Clear canvas: reset saved state and broadcast
+  socket.on('canvasClear', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    const artifact = state.artifacts[data.artifactId];
+    if (!artifact) return;
+    const noteId = user.currentNote || 'cover';
+    const timeStr = getTimeString();
+    // Overwrite version 1 (canvas always saves in place)
+    artifact.versions[0] = {
+      version: 1,
+      content: '{}',
+      modified: timeStr,
+      editor: user.name,
+      editorType: user.type
+    };
+    artifact.versions.length = 1;
+    broadcastToNote(noteId, 'canvasClear', { artifactId: data.artifactId });
+  });
+
+  // Auto-save: overwrite canvas state in place (no version accumulation)
+  socket.on('canvasSave', (data) => {
+    const user = state.users.get(socket.id);
+    if (!user) return;
+    const artifact = state.artifacts[data.artifactId];
+    if (!artifact) return;
+    const timeStr = getTimeString();
+    artifact.versions[0] = {
+      version: 1,
+      content: data.dataUrl,
+      modified: timeStr,
+      editor: user.name,
+      editorType: user.type
+    };
+    artifact.versions.length = 1;
+    if (data.sync) {
+      broadcastToNote(artifact.noteId, 'canvasSync', { artifactId: data.artifactId, json: data.dataUrl, from: socket.id });
+    }
+  });
+
   // --------------------------------------------
   // LIGHT BIKE GAME
   // --------------------------------------------
