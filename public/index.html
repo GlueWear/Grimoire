@@ -3664,7 +3664,12 @@
     });
 
     socket.on('canvasSync', (data) => {
-      if (data.from === socket.id) return;
+      // Always update local artifacts cache so note-switch restores correctly
+      if (artifacts[data.artifactId] && artifacts[data.artifactId].versions) {
+        artifacts[data.artifactId].versions[0].content = data.json;
+      }
+      // Only reload live Fabric canvas for undo events from another user
+      if (!data.sync || data.from === socket.id) return;
       const state = canvasStates[data.artifactId];
       if (!state || !data.json) return;
       state.fc.loadFromJSON(data.json, () => state.fc.renderAll());
@@ -3858,6 +3863,19 @@
           pre.textContent = text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '');
         } catch (err) {
           pre.textContent = 'Could not load file.';
+        }
+      });
+      container.querySelectorAll('.docx-preview[id]').forEach(async (div) => {
+        const artifactId = div.closest('[data-artifact-id]')?.dataset.artifactId;
+        if (!artifactId || !artifacts[artifactId]) return;
+        const src = artifacts[artifactId].versions?.[0]?.content || artifacts[artifactId].content;
+        if (!src) return;
+        try {
+          const res = await fetch('/api/preview/docx?path=' + encodeURIComponent(src));
+          const data = await res.json();
+          div.innerHTML = data.html || '<em>Empty document</em>';
+        } catch (err) {
+          div.textContent = 'Could not load preview.';
         }
       });
     }
@@ -4685,12 +4703,18 @@ export { authenticateUser };`
         const textExts  = ['txt', 'csv', 'json', 'xml', 'yaml', 'yml', 'md', 'log'];
 
         let previewHtml = '';
+        let noClip = false;
         if (audioExts.includes(ext)) {
           previewHtml = `<audio controls style="width:100%;margin-top:0.3rem;"><source src="${url}">Your browser does not support audio.</audio>`;
         } else if (videoExts.includes(ext)) {
           previewHtml = `<video controls style="width:100%;max-height:300px;margin-top:0.3rem;background:#000;"><source src="${url}">Your browser does not support video.</video>`;
+          noClip = true;
         } else if (ext === 'pdf') {
           previewHtml = `<iframe src="${url}" style="width:100%;height:400px;border:none;margin-top:0.3rem;"></iframe>`;
+          noClip = true;
+        } else if (ext === 'docx') {
+          const previewId = 'docx-' + artifact.id;
+          previewHtml = `<div class="docx-preview" id="${previewId}" style="max-height:300px;overflow:auto;padding:0.5rem;background:#fff;color:#111;font-size:0.85rem;margin-top:0.3rem;">Loading...</div>`;
         } else if (textExts.includes(ext)) {
           previewHtml = `<pre class="file-text-preview" data-src="${url}" style="max-height:200px;overflow:auto;font-size:0.8rem;color:#aaa;margin-top:0.3rem;">Loading...</pre>`;
         }
@@ -4703,11 +4727,12 @@ export { authenticateUser };`
                 <span class="artifact-name">${name}</span>
               </span>
               <div class="artifact-inline-actions">
+                <button class="artifact-inline-btn" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
                 <a class="artifact-inline-btn" href="${url}" download="${name}" title="Download">↓</a>
                 <button class="artifact-delete-btn" onclick="deleteArtifact('${artifact.id}')" title="Delete">✕</button>
               </div>
             </div>
-            ${previewHtml ? `<div class="artifact-inline-content${videoExts.includes(ext) ? ' no-clip' : ''}">${previewHtml}</div>` : ''}
+            ${previewHtml ? `<div class="artifact-inline-content${noClip ? ' no-clip' : ''}">${previewHtml}</div>` : ''}
           </div>
         `;
       }
@@ -4896,13 +4921,14 @@ export { authenticateUser };`
       fc.freeDrawingBrush.color = '#ff6600';
       fc.freeDrawingBrush.width = 3;
 
-      canvasStates[idSuffix] = { fc, tool: 'pen', artifactId, strokeCount: 0, undoStack: [], textMode: false };
+      canvasStates[idSuffix] = { fc, tool: 'pen', artifactId, strokeCount: 0, undoStack: [], textMode: false, autoSave: null };
       initCanvasDragDrop(idSuffix);
 
       // Capture-phase mousedown: disable drawing BEFORE Fabric sees the event
       // so clicking back from color picker / toolbar doesn't start a stroke
       const wrapEl = document.getElementById('canvas-wrap-' + idSuffix);
       wrapEl.addEventListener('mousedown', () => {
+        lastActiveCanvasId = idSuffix;
         const active = document.activeElement;
         if (active && active.classList.contains('canvas-color-input')) {
           if (fc.isDrawingMode) {
@@ -4928,7 +4954,11 @@ export { authenticateUser };`
       const autoSave = () => {
         const json = JSON.stringify(fc.toJSON(['id']));
         socket.emit('canvasSave', { artifactId, dataUrl: json });
+        if (artifacts[artifactId] && artifacts[artifactId].versions) {
+          artifacts[artifactId].versions[0].content = json;
+        }
       };
+      canvasStates[idSuffix].autoSave = autoSave;
 
       const pushUndo = () => {
         const state = canvasStates[idSuffix];
@@ -5118,22 +5148,31 @@ export { authenticateUser };`
     }
 
     // ---- Canvas: paste image ----
+    // Track last canvas the user clicked on (more reliable than activeElement)
+    let lastActiveCanvasId = null;
+
     document.addEventListener('paste', (e) => {
       if (e.defaultPrevented) return;
-      const wrap = document.querySelector('.canvas-inline-wrap');
-      if (!wrap) return;
+      // Don't intercept when a text field has focus
       const active = document.activeElement;
-      if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) return;
+      if (active && active.tagName === 'TEXTAREA') return;
+      if (active && active.tagName === 'INPUT') return;
+      // Need a canvas the user has recently clicked
+      if (!lastActiveCanvasId) return;
+      const wrap = document.getElementById('canvas-wrap-' + lastActiveCanvasId);
+      if (!wrap) return; // canvas no longer in DOM (note switched)
+      const state = canvasStates[lastActiveCanvasId];
+      if (!state) return;
       const items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
       for (const item of items) {
         if (item.type.startsWith('image/')) {
-          const blob = item.getAsFile();
-          const blobUrl = URL.createObjectURL(blob);
-          // Find which canvas is active/visible
-          const idSuffix = wrap.id.replace('canvas-wrap-', '');
-          if (canvasStates[idSuffix]) canvasAddImageFromUrl(idSuffix, blobUrl);
           e.preventDefault();
+          const blob = item.getAsFile();
+          const canvasId = lastActiveCanvasId;
+          uploadFile(blob).then(result => {
+            if (result && result.url) canvasAddImageFromUrl(canvasId, result.url);
+          });
           break;
         }
       }
@@ -5247,6 +5286,7 @@ export { authenticateUser };`
           object: img.toJSON(['id']),
           from: socket.id
         });
+        if (state.autoSave) state.autoSave();
       }, { crossOrigin: 'anonymous' });
     }
 
@@ -5569,20 +5609,59 @@ export { authenticateUser };`
       `;
       
       const contentEl = document.getElementById('fullscreenContent');
-      
+      contentEl.style.alignItems = '';
+      contentEl.style.overflow = '';
+
       if (artifact.type === 'image' || (artifact.type === 'file' && isImageUrl(content))) {
         contentEl.innerHTML = `<img src="${escapeHtml(content)}">`;
         contentEl.className = 'artifact-fullscreen-content';
       } else if (artifact.type === 'file') {
         const filename = artifact.name || content.split('/').pop();
-        contentEl.innerHTML = `
-          <div style="text-align:center; padding: 2rem;">
-            <div style="font-size: 3rem; margin-bottom: 1rem;">⊞</div>
-            <div style="color: #aaa; margin-bottom: 1rem;">${escapeHtml(filename)}</div>
-            <a href="${escapeHtml(content)}" download="${escapeHtml(filename)}" style="color: var(--amber); font-family: monospace;">↓ DOWNLOAD</a>
-          </div>
-        `;
+        const ext = filename.split('.').pop().toLowerCase();
+        const url = escapeHtml(content);
+        const name = escapeHtml(filename);
+        const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'];
+        const videoExts = ['mp4', 'webm', 'mov', 'mkv', 'avi'];
+        const textExts  = ['txt', 'csv', 'json', 'xml', 'yaml', 'yml', 'md', 'log'];
+        let fsHtml = '';
+        if (audioExts.includes(ext)) {
+          fsHtml = `<audio controls style="width:80%;"><source src="${url}">Your browser does not support audio.</audio>`;
+        } else if (videoExts.includes(ext)) {
+          fsHtml = `<video controls style="width:100%;max-height:80vh;background:#000;"><source src="${url}">Your browser does not support video.</video>`;
+        } else if (ext === 'pdf') {
+          fsHtml = `<iframe src="${url}" style="width:100%;height:85vh;border:none;"></iframe>`;
+        } else if (ext === 'docx') {
+          contentEl.style.alignItems = 'flex-start';
+          fsHtml = `<div id="fs-docx-preview" style="width:100%;max-width:900px;background:#fff;color:#111;padding:2rem;font-size:0.95rem;line-height:1.6;">Loading...</div>`;
+        } else if (textExts.includes(ext)) {
+          fsHtml = `<pre id="fs-text-preview" style="max-width:900px;width:100%;color:#bbb;font-size:0.9rem;white-space:pre-wrap;overflow:auto;max-height:85vh;">Loading...</pre>`;
+        } else {
+          fsHtml = `<div style="text-align:center;padding:2rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">⊞</div>
+            <div style="color:#aaa;margin-bottom:1rem;">${name}</div>
+            <div style="color:#555;margin-bottom:1.5rem;font-size:0.85rem;">No preview available for .${escapeHtml(ext)} files</div>
+            <a href="${url}" download="${name}" style="color:var(--amber);font-family:monospace;">↓ DOWNLOAD</a>
+          </div>`;
+        }
+        contentEl.innerHTML = fsHtml;
         contentEl.className = 'artifact-fullscreen-content';
+        if (ext === 'docx') {
+          fetch('/api/preview/docx?path=' + encodeURIComponent(content)).then(r => r.json()).then(data => {
+            const el = document.getElementById('fs-docx-preview');
+            if (el) el.innerHTML = data.html || '<em>Empty document</em>';
+          }).catch(() => {
+            const el = document.getElementById('fs-docx-preview');
+            if (el) el.textContent = 'Could not load preview.';
+          });
+        } else if (textExts.includes(ext)) {
+          fetch(content).then(r => r.text()).then(t => {
+            const el = document.getElementById('fs-text-preview');
+            if (el) el.textContent = t;
+          }).catch(() => {
+            const el = document.getElementById('fs-text-preview');
+            if (el) el.textContent = 'Could not load file.';
+          });
+        }
       } else if (artifact.type === 'lightbike') {
         contentEl.innerHTML = `
           <div class="lightbike-game-container-fullscreen">
@@ -5603,10 +5682,12 @@ export { authenticateUser };`
         contentEl.className = 'artifact-fullscreen-content';
       }
       
+      document.documentElement.style.overflow = 'hidden';
       document.getElementById('artifactFullscreen').classList.add('open');
     }
-    
+
     function closeFullscreen() {
+      document.documentElement.style.overflow = '';
       document.getElementById('artifactFullscreen').classList.remove('open');
       currentFullscreenArtifactId = null;
     }
@@ -5728,24 +5809,21 @@ export { authenticateUser };`
       const title = document.getElementById('modalTitle');
       const languageField = document.getElementById('languageField');
       const contentField = document.getElementById('contentField');
-      const imageField = document.getElementById('imageField');
       const submitBtn = document.querySelector('.modal-submit-btn');
-      
+
       // Set modal title
       title.textContent = 'Edit: ' + artifact.name;
       submitBtn.textContent = 'SAVE';
-      
+
       // Configure modal based on type
       if (artifact.type === 'markdown') {
         currentArtifactType = 'markdown';
         languageField.style.display = 'none';
         contentField.style.display = 'flex';
-        imageField.style.display = 'none';
       } else {
         currentArtifactType = 'code';
         languageField.style.display = 'flex';
         contentField.style.display = 'flex';
-        imageField.style.display = 'none';
         document.getElementById('artifactLanguage').value = artifact.type;
       }
       

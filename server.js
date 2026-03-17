@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const crypto = require('crypto');
+const mammoth = require('mammoth');
 
 const app = express();
 const server = createServer(app);
@@ -45,6 +46,22 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     originalName: req.file.originalname,
     mimetype: req.file.mimetype
   });
+});
+
+app.get('/api/preview/docx', async (req, res) => {
+  const filePath = req.query.path;
+  if (!filePath) return res.status(400).json({ error: 'Missing path' });
+  // Only allow files inside public/uploads
+  const resolved = path.resolve(__dirname, 'public', filePath.replace(/^\//, ''));
+  if (!resolved.startsWith(path.resolve(__dirname, 'public', 'uploads'))) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  try {
+    const result = await mammoth.convertToHtml({ path: resolved });
+    res.json({ html: result.value });
+  } catch (err) {
+    res.status(500).json({ error: 'Conversion failed: ' + err.message });
+  }
 });
 
 // ============================================
@@ -1397,9 +1414,7 @@ io.on('connection', (socket) => {
       editorType: user.type
     };
     artifact.versions.length = 1;
-    if (data.sync) {
-      broadcastToNote(artifact.noteId, 'canvasSync', { artifactId: data.artifactId, json: data.dataUrl, from: socket.id });
-    }
+    broadcastToNote(artifact.noteId, 'canvasSync', { artifactId: data.artifactId, json: data.dataUrl, from: socket.id, sync: data.sync });
   });
 
   // --------------------------------------------
@@ -1490,7 +1505,22 @@ io.on('connection', (socket) => {
     // Get note for this artifact
     const artifact = state.artifacts[artifactId];
     const noteId = artifact ? artifact.noteId : 'cover';
-    
+    const note = state.notes[noteId];
+
+    // Announce game start in chat
+    const startMsgId = 'msg-' + (++messageIdCounter);
+    const startMsg = {
+      id: startMsgId,
+      noteId,
+      author: 'SYSTEM',
+      authorType: 'system',
+      text: `LIGHT BIKE: ${game.player1.bot} (${game.player1.owner}) vs ${game.player2.bot} (${game.player2.owner}) — GAME STARTED`,
+      time: getTimeString(),
+      timestamp: Date.now()
+    };
+    if (note) note.messages.push(startMsg);
+    broadcastToNote(noteId, 'message', startMsg);
+
     // Send initial briefing to LLM bots
     const briefingP1 = `You are playing LIGHT BIKE (like Tron).
 
@@ -1678,6 +1708,19 @@ Your move? (LEFT, RIGHT, or STRAIGHT)`;
       
       if (game.state === 'finished') {
         clearInterval(gameLoop);
+        const endMsgId = 'msg-' + (++messageIdCounter);
+        const resultText = game.winner ? `LIGHT BIKE: ${game.winner} WINS!` : 'LIGHT BIKE: DRAW!';
+        const endMsg = {
+          id: endMsgId,
+          noteId,
+          author: 'SYSTEM',
+          authorType: 'system',
+          text: resultText,
+          time: getTimeString(),
+          timestamp: Date.now()
+        };
+        if (note) note.messages.push(endMsg);
+        broadcastToNote(noteId, 'message', endMsg);
       }
     }, 10000); // 10 seconds per tick
   });
