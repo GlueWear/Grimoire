@@ -6,6 +6,7 @@
   <title>GRIMOIRE</title>
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script src="/urbit-ob-browser.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
@@ -1849,11 +1850,32 @@
       border-color: var(--amber);
       color: var(--amber);
     }
+
+    .artifact-delete-btn {
+      font-family: 'VT323', monospace;
+      font-size: 0.8rem;
+      padding: 0.15rem 0.4rem;
+      background: transparent;
+      border: 1px solid #333;
+      color: #444;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .artifact-delete-btn:hover {
+      border-color: #c0392b;
+      color: #c0392b;
+    }
     
     .artifact-inline-content {
       padding: 0.75rem;
       max-height: 300px;
       overflow: auto;
+    }
+
+    .artifact-inline-content.no-clip {
+      max-height: none;
+      overflow: visible;
     }
     
     .artifact-inline-content pre {
@@ -2174,6 +2196,144 @@
       height: 600px;
     }
     
+    /* Canvas Artifact */
+    .artifact-inline.canvas-artifact .artifact-inline-content {
+      padding: 0;
+      background: #fff;
+      overflow: hidden;
+      max-height: none;
+    }
+
+    .canvas-toolbar {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.35rem 0.5rem;
+      background: #111;
+      border-bottom: 1px solid #222;
+      align-items: center;
+    }
+
+    .canvas-tool-btn {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #aaa;
+      padding: 0.15rem 0.45rem;
+      font-family: monospace;
+      font-size: 0.85rem;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+
+    .canvas-tool-btn:hover {
+      border-color: #555;
+      color: #fff;
+    }
+
+    .canvas-tool-btn.active {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+
+    .canvas-color-input {
+      width: 24px;
+      height: 24px;
+      border: 1px solid #333;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .canvas-size-input {
+      width: 60px;
+      accent-color: var(--amber);
+    }
+
+    .canvas-separator {
+      color: #333;
+      user-select: none;
+    }
+
+    /* Inline canvas: scale 900x900 down to fit chat column */
+    .canvas-inline-wrap {
+      width: 100%;
+      max-width: 650px;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      position: relative;
+      background: #fff;
+    }
+
+    .canvas-inline-wrap .canvas-container {
+      transform: scale(0.722);
+      transform-origin: top left;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Img dropdown */
+    .canvas-img-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .canvas-img-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      z-index: 100;
+      min-width: 90px;
+    }
+
+    .canvas-img-menu.open {
+      display: block;
+    }
+
+    .canvas-img-menu button {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      border-bottom: 1px solid #222;
+      color: #aaa;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .canvas-img-menu button:last-child { border-bottom: none; }
+    .canvas-img-menu button:hover { background: #2a2a2a; color: #fff; }
+
+    .canvas-context-menu {
+      display: none;
+      position: fixed;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      z-index: 9999;
+      min-width: 130px;
+    }
+    .canvas-context-menu.open { display: block; }
+    .canvas-context-menu button {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      border-bottom: 1px solid #222;
+      color: #aaa;
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.7rem;
+      cursor: pointer;
+      text-align: left;
+    }
+    .canvas-context-menu button:last-child { border-bottom: none; }
+    .canvas-context-menu button:hover { background: #2a2a2a; color: #fff; }
+
     /* Image Lightbox */
     .lightbox-overlay {
       display: none;
@@ -2205,6 +2365,75 @@
       border-top: 1px solid #222;
       background: #0d0d0d;
     }
+
+    .chat-input-area.drag-over {
+      outline: 2px solid var(--amber);
+      outline-offset: -2px;
+    }
+
+    .chat-pending-files {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }
+
+    .chat-pending-file {
+      position: relative;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      padding: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #aaa;
+      max-width: 160px;
+    }
+
+    .chat-pending-file img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .chat-pending-file .file-icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .chat-pending-file .file-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-pending-file .remove-pending {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 16px;
+      height: 16px;
+      background: #333;
+      border: 1px solid #555;
+      color: #aaa;
+      font-size: 0.65rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .chat-pending-file .remove-pending:hover { background: #c0392b; color: #fff; }
     
     .chat-input-row {
       display: flex;
@@ -2711,15 +2940,18 @@
             <span class="quote-indicator-text" id="quoteText"></span>
             <button class="quote-indicator-close" onclick="cancelQuote()">✕</button>
           </div>
+          <div class="chat-pending-files" id="chatPendingFiles"></div>
           <div class="chat-input-row">
             <textarea class="chat-input" id="chatInput" placeholder="message..." onkeydown="handleChatEnter(event)" oninput="handleChatInput(event)" rows="1"></textarea>
             <div class="chat-input-actions">
               <button class="chat-action-btn" title="Attach" onclick="toggleArtifactMenu()">+</button>
               <div class="artifact-menu" id="artifactMenu">
                 <button class="artifact-menu-item" onclick="openArtifactModal('code')">{ } Code</button>
-                <button class="artifact-menu-item" onclick="openArtifactModal('image')">▢ Image</button>
+                <button class="artifact-menu-item" onclick="triggerImageUpload()">⊞ File / Img</button>
+                <button class="artifact-menu-item" onclick="openArtifactModal('canvas')">▢ Canvas</button>
                 <button class="artifact-menu-item" onclick="openArtifactModal('lightbike')">╔ Light Bike</button>
               </div>
+              <input type="file" id="imageUploadInput" style="display:none" onchange="handleImageUpload(event)">
               <div class="mentions-dropdown" id="mentionsDropdown"></div>
             </div>
             <button class="chat-send-btn" onclick="sendMessage()">SEND</button>
@@ -2776,14 +3008,6 @@
           <label class="modal-label">Content</label>
           <textarea class="modal-textarea" id="artifactContentInput" placeholder="Enter content..."></textarea>
         </div>
-        <div class="modal-field" id="imageCommentField" style="display: none;">
-          <label class="modal-label">Comment (optional)</label>
-          <input type="text" class="modal-input" id="artifactImageComment" placeholder="Add a comment...">
-        </div>
-        <div class="modal-field" id="imageField" style="display: none;">
-          <label class="modal-label">Image URL</label>
-          <input type="text" class="modal-input" id="artifactImageUrl" placeholder="https://...">
-        </div>
         <div class="modal-field" id="lightbikeField" style="display: none;">
           <label class="modal-label">Game Settings</label>
           <div style="color: #666; font-size: 0.9rem; padding: 0.5rem; background: #111; border: 1px solid #222;">
@@ -2820,6 +3044,11 @@
   <!-- Image Lightbox -->
   <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
     <img class="lightbox-image" id="lightboxImage" src="" onclick="event.stopPropagation()">
+  </div>
+
+  <!-- Canvas context menu (right-click) -->
+  <div class="canvas-context-menu" id="canvasContextMenu">
+    <button onclick="canvasContextSave()">Save image</button>
   </div>
 
   <!-- Wallet Panel -->
@@ -3245,18 +3474,18 @@
         renderNotesList();
       }
       
-      // Load messages for current note (Cover)
-      if (notes.cover && notes.cover.messages) {
-        notes.cover.messages.forEach(msg => {
-          renderMessage(msg);
-        });
-      }
-      
-      // Load artifacts
+      // Load artifacts first so inline renders work when messages are displayed
       if (data.artifacts) {
         Object.entries(data.artifacts).forEach(([id, artifact]) => {
           artifacts[id] = artifact;
           addArtifactToSidebar(artifact);
+        });
+      }
+
+      // Load messages for current note (Cover)
+      if (notes.cover && notes.cover.messages) {
+        notes.cover.messages.forEach(msg => {
+          renderMessage(msg);
         });
       }
       
@@ -3387,6 +3616,64 @@
         openArtifact(artifact.id);
       }
     });
+
+    socket.on('artifactDeleted', ({ artifactId }) => {
+      delete artifacts[artifactId];
+      if (currentOpenArtifactId === artifactId) closeArtifact();
+      document.querySelectorAll(`[data-artifact-id="${artifactId}"]`).forEach(el => {
+        const msg = el.closest('.message');
+        if (msg) msg.remove();
+        else el.remove();
+      });
+    });
+
+    socket.on('canvasObjectAdded', (data) => {
+      if (data.from === socket.id) return;
+      const state = canvasStates[data.artifactId];
+      if (!state) return;
+      fabric.util.enlivenObjects([data.object], (objects) => {
+        objects.forEach(obj => {
+          obj._fromSync = true;
+          obj.id = data.object.id;
+          state.fc.add(obj);
+          state.fc.renderAll();
+        });
+      });
+    });
+
+    socket.on('canvasObjectModified', (data) => {
+      if (data.from === socket.id) return;
+      const state = canvasStates[data.artifactId];
+      if (!state) return;
+      const target = state.fc.getObjects().find(o => o.id === data.id);
+      if (target) {
+        target._fromSync = true;
+        target.set(data.object);
+        target.setCoords();
+        state.fc.renderAll();
+      }
+    });
+
+    socket.on('canvasClear', (data) => {
+      const state = canvasStates[data.artifactId];
+      if (state) {
+        state.fc.clear();
+        state.fc.setBackgroundColor('#ffffff', state.fc.renderAll.bind(state.fc));
+        state.undoStack = [JSON.stringify(state.fc.toJSON(['id']))];
+      }
+    });
+
+    socket.on('canvasSync', (data) => {
+      // Always update local artifacts cache so note-switch restores correctly
+      if (artifacts[data.artifactId] && artifacts[data.artifactId].versions) {
+        artifacts[data.artifactId].versions[0].content = data.json;
+      }
+      // Only reload live Fabric canvas for undo events from another user
+      if (!data.sync || data.from === socket.id) return;
+      const state = canvasStates[data.artifactId];
+      if (!state || !data.json) return;
+      state.fc.loadFromJSON(data.json, () => state.fc.renderAll());
+    });
     
     socket.on('walletUpdate', (wallet) => {
       console.log('Wallet update:', wallet);
@@ -3461,10 +3748,10 @@
           // Render inline artifact
           bodyContent = renderInlineArtifact(artifact, version);
         } else {
-          bodyContent = parseMentions(escapeHtml(msg.text));
+          bodyContent = renderMessageText(msg.text);
         }
       } else {
-        bodyContent = parseMentions(escapeHtml(msg.text));
+        bodyContent = renderMessageText(msg.text);
       }
       
       messageDiv.innerHTML = `
@@ -3550,17 +3837,47 @@
       messagesContainer.appendChild(messageDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
-      // Initialize lightbike canvas if this is a lightbike artifact
+      // Initialize interactive artifacts
       if (msg.artifactId) {
         const artifact = artifacts[msg.artifactId];
         if (artifact && artifact.type === 'lightbike') {
           initLightBikeCanvas(msg.artifactId);
+        } else if (artifact && artifact.type === 'canvas') {
+          setTimeout(() => initCanvas(msg.artifactId), 50);
+        } else if (artifact && artifact.type === 'file') {
+          loadTextFilePreviews(messageDiv);
         }
       }
     }
     
     function addArtifactToSidebar(artifact) {
       // TODO: add to left sidebar artifacts list
+    }
+
+    function loadTextFilePreviews(container) {
+      container.querySelectorAll('pre.file-text-preview[data-src]').forEach(async (pre) => {
+        const src = pre.dataset.src;
+        try {
+          const res = await fetch(src);
+          const text = await res.text();
+          pre.textContent = text.slice(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : '');
+        } catch (err) {
+          pre.textContent = 'Could not load file.';
+        }
+      });
+      container.querySelectorAll('.docx-preview[id]').forEach(async (div) => {
+        const artifactId = div.closest('[data-artifact-id]')?.dataset.artifactId;
+        if (!artifactId || !artifacts[artifactId]) return;
+        const src = artifacts[artifactId].versions?.[0]?.content || artifacts[artifactId].content;
+        if (!src) return;
+        try {
+          const res = await fetch('/api/preview/docx?path=' + encodeURIComponent(src));
+          const data = await res.json();
+          div.innerHTML = data.html || '<em>Empty document</em>';
+        } catch (err) {
+          div.textContent = 'Could not load preview.';
+        }
+      });
     }
     
     // Chat functions
@@ -3658,9 +3975,29 @@
       hideMentionsDropdown();
     }
     
-    function sendMessage() {
+    async function sendMessage() {
       const input = document.getElementById('chatInput');
       const text = input.value.trim();
+      if (!text && pendingChatFiles.length === 0) return;
+
+      // Upload and post any pending files first
+      if (pendingChatFiles.length > 0) {
+        const filesToSend = [...pendingChatFiles];
+        pendingChatFiles = [];
+        renderPendingFiles();
+        for (const pf of filesToSend) {
+          const result = await uploadFile(pf.file);
+          if (result) {
+            socket.emit('createArtifact', {
+              name: pf.name,
+              type: 'file',
+              content: result.url,
+              comment: 'uploaded: ' + pf.name
+            });
+          }
+        }
+      }
+
       if (!text) return;
       
       // Check for @mentions and auto-invite (only in non-Cover notes)
@@ -3897,6 +4234,10 @@
       return name;
     }
     
+    function renderMessageText(text) {
+      return parseMentions(escapeHtml(text));
+    }
+
     function parseMentions(text) {
       // Replace @username with styled mention spans
       let parsed = text.replace(/@([~\w-]+)/g, (match, name) => {
@@ -3928,6 +4269,12 @@
         </div>`;
       });
       
+      // Base64 data image URLs
+      const dataImageRegex = /(data:image\/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+)/g;
+      text = text.replace(dataImageRegex, (match) => {
+        return `<div class="url-embed image-embed"><img src="${match}" onerror="this.parentElement.style.display='none'"></div>`;
+      });
+
       // Image URLs (common formats)
       const imageRegex = /(https?:\/\/[^\s]+\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?)/gi;
       text = text.replace(imageRegex, (match, url) => {
@@ -3939,13 +4286,19 @@
       });
       
       // Regular URLs - make clickable (but not ones we already embedded)
-      const urlRegex = /(?<!src="|href=")(https?:\/\/[^\s<]+)/g;
-      text = text.replace(urlRegex, (match) => {
-        // Skip if it's a YouTube or image we already handled
+      const urlRegex = /(https?:\/\/[^\s<"]+)/g;
+      text = text.replace(urlRegex, (match, url, offset, str) => {
+        // Skip if already inside an HTML attribute (src= or href=)
+        const before = str.substring(Math.max(0, offset - 6), offset);
+        if (before.includes('src=') || before.includes('href=')) return match;
+        // Skip YouTube and image URLs already handled above
         if (match.match(/youtube\.com|youtu\.be/) || match.match(/\.(png|jpg|jpeg|gif|webp)(\?|$)/i)) {
           return match;
         }
-        return `<a href="${match}" target="_blank" rel="noopener" class="url-link">${match}</a>`;
+        // Strip trailing punctuation that's likely not part of the URL
+        const clean = match.replace(/[.,!?;:)"']+$/, '');
+        const trail = match.slice(clean.length);
+        return `<a href="${clean}" target="_blank" rel="noopener" class="url-link">${clean}</a>${trail}`;
       });
       
       return text;
@@ -4115,48 +4468,35 @@ export { authenticateUser };`
       const nameField = document.getElementById('nameField');
       const languageField = document.getElementById('languageField');
       const contentField = document.getElementById('contentField');
-      const imageField = document.getElementById('imageField');
-      const imageCommentField = document.getElementById('imageCommentField');
       const lightbikeField = document.getElementById('lightbikeField');
-      
+
       menu.classList.remove('open');
-      
+
       // Hide all optional fields first
       nameField.style.display = 'flex';
       languageField.style.display = 'none';
       contentField.style.display = 'flex';
-      imageField.style.display = 'none';
-      imageCommentField.style.display = 'none';
       lightbikeField.style.display = 'none';
-      
+
       // Configure modal based on type
       if (type === 'code') {
         title.textContent = 'Create Code';
         languageField.style.display = 'flex';
-      } else if (type === 'image') {
-        title.textContent = 'Add Image';
-        nameField.style.display = 'none';
+      } else if (type === 'canvas') {
+        title.textContent = 'Create Canvas';
         contentField.style.display = 'none';
-        imageField.style.display = 'flex';
-        imageCommentField.style.display = 'flex';
       } else if (type === 'lightbike') {
         title.textContent = 'Create Light Bike Game';
         contentField.style.display = 'none';
         lightbikeField.style.display = 'flex';
       }
-      
+
       // Clear inputs
       document.getElementById('artifactNameInput').value = '';
       document.getElementById('artifactContentInput').value = '';
-      document.getElementById('artifactImageUrl').value = '';
-      document.getElementById('artifactImageComment').value = '';
-      
+
       modal.classList.add('open');
-      if (type === 'image') {
-        document.getElementById('artifactImageComment').focus();
-      } else {
-        document.getElementById('artifactNameInput').focus();
-      }
+      document.getElementById('artifactNameInput').focus();
     }
     
     function closeArtifactModal() {
@@ -4204,14 +4544,11 @@ export { authenticateUser };`
         let content = '';
         let comment = '';
         
-        if (currentArtifactType === 'image') {
-          content = document.getElementById('artifactImageUrl').value.trim();
-          comment = document.getElementById('artifactImageComment').value.trim();
-          if (!content) {
-            alert('Please enter an image URL');
-            return;
+        if (currentArtifactType === 'canvas') {
+          if (!name) {
+            name = 'canvas-' + Date.now();
           }
-          name = 'image-' + Date.now();
+          content = '';
         } else if (currentArtifactType === 'lightbike') {
           // Light Bike game
           if (!name) {
@@ -4325,8 +4662,16 @@ export { authenticateUser };`
     // Get artifact type icon
     function getArtifactTypeIcon(type) {
       if (type === 'image') return '▢';
+      if (type === 'file') return '⊞';
+      if (type === 'canvas') return '▢';
       if (type === 'lightbike') return '╔';
       return '{ }'; // code (includes markdown now)
+    }
+
+    function isImageUrl(url) {
+      if (!url) return false;
+      if (/^data:image\//i.test(url)) return true;
+      return /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(url);
     }
     
     // Render inline artifact in chat
@@ -4335,19 +4680,68 @@ export { authenticateUser };`
       const content = versionData ? versionData.content : (artifact.content || '');
       const typeIcon = getArtifactTypeIcon(artifact.type);
       
-      // Images get simple treatment - just image + expand button
-      if (artifact.type === 'image') {
+      // Legacy image artifacts and file artifacts that are images: simple inline display
+      if (artifact.type === 'image' || (artifact.type === 'file' && isImageUrl(content))) {
         return `
           <div class="artifact-image-simple" data-artifact-id="${artifact.id}" data-version="${version}">
             <img src="${escapeHtml(content)}" onclick="expandArtifact('${artifact.id}', ${version})" onerror="this.style.display='none'">
             <button class="artifact-image-expand" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
+            <button class="artifact-delete-btn" style="position:absolute;top:4px;right:4px;" onclick="deleteArtifact('${artifact.id}')" title="Delete">✕</button>
+          </div>
+        `;
+      }
+
+      // Non-image file uploads: rich preview based on type
+      if (artifact.type === 'file') {
+        const filename = artifact.name || content.split('/').pop();
+        const ext = filename.split('.').pop().toLowerCase();
+        const url = escapeHtml(content);
+        const name = escapeHtml(filename);
+
+        const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'];
+        const videoExts = ['mp4', 'webm', 'mov', 'mkv', 'avi'];
+        const textExts  = ['txt', 'csv', 'json', 'xml', 'yaml', 'yml', 'md', 'log'];
+
+        let previewHtml = '';
+        let noClip = false;
+        if (audioExts.includes(ext)) {
+          previewHtml = `<audio controls style="width:100%;margin-top:0.3rem;"><source src="${url}">Your browser does not support audio.</audio>`;
+        } else if (videoExts.includes(ext)) {
+          previewHtml = `<video controls style="width:100%;max-height:300px;margin-top:0.3rem;background:#000;"><source src="${url}">Your browser does not support video.</video>`;
+          noClip = true;
+        } else if (ext === 'pdf') {
+          previewHtml = `<iframe src="${url}" style="width:100%;height:400px;border:none;margin-top:0.3rem;"></iframe>`;
+          noClip = true;
+        } else if (ext === 'docx') {
+          const previewId = 'docx-' + artifact.id;
+          previewHtml = `<div class="docx-preview" id="${previewId}" style="max-height:300px;overflow:auto;padding:0.5rem;background:#fff;color:#111;font-size:0.85rem;margin-top:0.3rem;">Loading...</div>`;
+        } else if (textExts.includes(ext)) {
+          previewHtml = `<pre class="file-text-preview" data-src="${url}" style="max-height:200px;overflow:auto;font-size:0.8rem;color:#aaa;margin-top:0.3rem;">Loading...</pre>`;
+        }
+
+        return `
+          <div class="artifact-inline" data-artifact-id="${artifact.id}" data-version="${version}">
+            <div class="artifact-inline-header">
+              <span class="artifact-inline-title">
+                <span class="artifact-type-icon">⊞</span>
+                <span class="artifact-name">${name}</span>
+              </span>
+              <div class="artifact-inline-actions">
+                <button class="artifact-inline-btn" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
+                <a class="artifact-inline-btn" href="${url}" download="${name}" title="Download">↓</a>
+                <button class="artifact-delete-btn" onclick="deleteArtifact('${artifact.id}')" title="Delete">✕</button>
+              </div>
+            </div>
+            ${previewHtml ? `<div class="artifact-inline-content${noClip ? ' no-clip' : ''}">${previewHtml}</div>` : ''}
           </div>
         `;
       }
       
       let contentHtml = '';
       
-      if (artifact.type === 'lightbike') {
+      if (artifact.type === 'canvas') {
+        contentHtml = renderCanvasInline(artifact.id);
+      } else if (artifact.type === 'lightbike') {
         contentHtml = renderLightBikeInline(artifact.id);
       } else if (artifact.type === 'markdown') {
         contentHtml = renderSimpleMarkdown(content);
@@ -4362,7 +4756,7 @@ export { authenticateUser };`
       const contentClass = artifact.type === 'markdown' ? 'artifact-inline-content markdown-content' : 'artifact-inline-content';
       
       return `
-        <div class="artifact-inline ${artifact.type === 'lightbike' ? 'lightbike' : ''}" data-artifact-id="${artifact.id}" data-version="${version}">
+        <div class="artifact-inline ${artifact.type === 'lightbike' ? 'lightbike' : artifact.type === 'canvas' ? 'canvas-artifact' : ''}" data-artifact-id="${artifact.id}" data-version="${version}">
           <div class="artifact-inline-header">
             <span class="artifact-inline-title">
               <span class="artifact-type-icon">${typeIcon}</span>
@@ -4370,8 +4764,9 @@ export { authenticateUser };`
               <span class="artifact-version">v${version}</span>
             </span>
             <div class="artifact-inline-actions">
-              <button class="artifact-inline-btn" onclick="openArtifactSource('${artifact.id}', ${version})" title="Source">&lt;/&gt;</button>
-              <button class="artifact-inline-btn" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>
+              ${artifact.type !== 'canvas' ? `<button class="artifact-inline-btn" onclick="openArtifactSource('${artifact.id}', ${version})" title="Source">&lt;/&gt;</button>` : ''}
+              ${artifact.type !== 'canvas' ? `<button class="artifact-inline-btn" onclick="expandArtifact('${artifact.id}', ${version})" title="Expand">⤢</button>` : ''}
+              <button class="artifact-delete-btn" onclick="deleteArtifact('${artifact.id}')" title="Delete">✕</button>
             </div>
           </div>
           <div class="${contentClass}">
@@ -4461,6 +4856,495 @@ export { authenticateUser };`
       `;
     }
     
+    // ============================================
+    // CANVAS ARTIFACT SYSTEM (Fabric.js)
+    // ============================================
+
+    let canvasStates = {}; // idSuffix → { fc, tool, artifactId, strokeCount }
+
+    function canvasArtifactId(idSuffix) {
+      return idSuffix.endsWith('-fs') ? idSuffix.slice(0, -3) : idSuffix;
+    }
+
+    function generateId() {
+      return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    }
+
+    function renderCanvasInline(artifactId) {
+      const idSuffix = artifactId;
+      return `
+        <div class="canvas-toolbar" id="canvas-toolbar-${idSuffix}">
+          <button class="canvas-tool-btn" id="canvas-select-${idSuffix}" onclick="setCanvasTool('${idSuffix}', 'select')" title="Select / Move">✥</button>
+          <button class="canvas-tool-btn active" id="canvas-pen-${idSuffix}" onclick="setCanvasTool('${idSuffix}', 'pen')" title="Pen">✏</button>
+          <button class="canvas-tool-btn" id="canvas-eraser-${idSuffix}" onclick="setCanvasTool('${idSuffix}', 'eraser')" title="Eraser">◻</button>
+          <button class="canvas-tool-btn" id="canvas-text-${idSuffix}" onclick="setCanvasTool('${idSuffix}', 'text')" title="Add Text">T</button>
+          <span class="canvas-separator">|</span>
+          <input type="color" class="canvas-color-input" id="canvas-color-${idSuffix}" value="#ff6600" onchange="setCanvasColor('${idSuffix}', this.value)" title="Color">
+          <input type="range" min="1" max="40" value="3" class="canvas-size-input" id="canvas-size-${idSuffix}" oninput="setCanvasSize('${idSuffix}', this.value)" title="Brush size">
+          <span class="canvas-separator">|</span>
+          <div class="canvas-img-dropdown" id="canvas-imgdrop-${idSuffix}">
+            <button class="canvas-tool-btn" onclick="toggleCanvasImgMenu('${idSuffix}')" title="Add image">⊞</button>
+            <div class="canvas-img-menu" id="canvas-imgmenu-${idSuffix}">
+              <button onclick="canvasImgFromUrl('${idSuffix}')">URL</button>
+              <button onclick="triggerCanvasUpload('${idSuffix}')">Upload</button>
+            </div>
+          </div>
+          <span class="canvas-separator">|</span>
+          <button class="canvas-tool-btn" onclick="canvasUndo('${idSuffix}')" title="Undo">↩</button>
+          <button class="canvas-tool-btn" onclick="canvasBringForward('${idSuffix}')" title="Bring forward">↑</button>
+          <button class="canvas-tool-btn" onclick="canvasSendBackward('${idSuffix}')" title="Send backward">↓</button>
+          <span class="canvas-separator">|</span>
+          <button class="canvas-tool-btn" onclick="clearCanvas('${artifactId}')" title="Clear canvas">⌫ clear</button>
+        </div>
+        <div class="canvas-inline-wrap" id="canvas-wrap-${idSuffix}">
+          <canvas id="canvas-${idSuffix}"></canvas>
+        </div>
+      `;
+    }
+
+    function initCanvas(artifactId) {
+      const idSuffix = artifactId;
+      const canvasEl = document.getElementById('canvas-' + idSuffix);
+      if (!canvasEl || canvasEl.dataset.initialized) return;
+      canvasEl.dataset.initialized = 'true';
+
+      const fc = new fabric.Canvas('canvas-' + idSuffix, {
+        width: 900,
+        height: 900,
+        backgroundColor: '#ffffff',
+        isDrawingMode: true,
+        selection: false,
+        preserveObjectStacking: true
+      });
+
+      fc.freeDrawingBrush = new fabric.PencilBrush(fc);
+      fc.freeDrawingBrush.color = '#ff6600';
+      fc.freeDrawingBrush.width = 3;
+
+      canvasStates[idSuffix] = { fc, tool: 'pen', artifactId, strokeCount: 0, undoStack: [], textMode: false, autoSave: null };
+      initCanvasDragDrop(idSuffix);
+
+      // Capture-phase mousedown: disable drawing BEFORE Fabric sees the event
+      // so clicking back from color picker / toolbar doesn't start a stroke
+      const wrapEl = document.getElementById('canvas-wrap-' + idSuffix);
+      wrapEl.addEventListener('mousedown', () => {
+        lastActiveCanvasId = idSuffix;
+        const active = document.activeElement;
+        if (active && active.classList.contains('canvas-color-input')) {
+          if (fc.isDrawingMode) {
+            fc.isDrawingMode = false;
+            setTimeout(() => { fc.isDrawingMode = true; }, 0);
+          }
+        }
+      }, true);
+
+      // Load saved state then seed undo stack
+      const artifact = artifacts[artifactId];
+      const savedContent = artifact && artifact.versions && artifact.versions.length > 0
+        ? artifact.versions[artifact.versions.length - 1].content : null;
+
+      const seedUndo = () => canvasStates[idSuffix].undoStack.push(JSON.stringify(fc.toJSON(['id'])));
+
+      if (savedContent && savedContent.startsWith('{')) {
+        fc.loadFromJSON(savedContent, () => { fc.renderAll(); seedUndo(); });
+      } else {
+        seedUndo();
+      }
+
+      const autoSave = () => {
+        const json = JSON.stringify(fc.toJSON(['id']));
+        socket.emit('canvasSave', { artifactId, dataUrl: json });
+        if (artifacts[artifactId] && artifacts[artifactId].versions) {
+          artifacts[artifactId].versions[0].content = json;
+        }
+      };
+      canvasStates[idSuffix].autoSave = autoSave;
+
+      const pushUndo = () => {
+        const state = canvasStates[idSuffix];
+        const json = JSON.stringify(fc.toJSON(['id']));
+        state.undoStack.push(json);
+        if (state.undoStack.length > 20) state.undoStack.shift();
+      };
+
+      // Completed stroke: assign id, broadcast, push undo, auto-save
+      fc.on('path:created', (e) => {
+        const path = e.path;
+        if (path._fromSync) return;
+        path.id = generateId();
+        socket.emit('canvasObjectAdded', { artifactId, object: path.toJSON(['id']), from: socket.id });
+        pushUndo();
+        autoSave();
+      });
+
+      // Object moved/resized: broadcast + push undo + auto-save
+      fc.on('object:modified', (e) => {
+        const obj = e.target;
+        if (!obj || !obj.id || obj._fromSync) return;
+        socket.emit('canvasObjectModified', { artifactId, id: obj.id, object: obj.toJSON(['id']), from: socket.id });
+        pushUndo();
+        autoSave();
+      });
+
+      // Text finished editing: broadcast modified
+      fc.on('text:editing:exited', (e) => {
+        const obj = e.target;
+        if (!obj || obj._fromSync) return;
+        if (!obj.id) obj.id = generateId();
+        socket.emit('canvasObjectModified', { artifactId, id: obj.id, object: obj.toJSON(['id']), from: socket.id });
+        pushUndo();
+        autoSave();
+      });
+
+      // Text mode: click canvas to place IText
+      fc.on('mouse:down', (e) => {
+        const state = canvasStates[idSuffix];
+        if (!state.textMode) return;
+        state.textMode = false;
+        setCanvasTool(idSuffix, 'select');
+        const pointer = fc.getPointer(e.e);
+        const text = new fabric.IText('Text', {
+          left: pointer.x, top: pointer.y,
+          fontSize: 24,
+          fill: document.getElementById('canvas-color-' + idSuffix)?.value || '#ff6600',
+          fontFamily: 'monospace'
+        });
+        text.id = generateId();
+        fc.add(text);
+        fc.setActiveObject(text);
+        text.enterEditing();
+        text.selectAll();
+        fc.renderAll();
+        socket.emit('canvasObjectAdded', { artifactId, object: text.toJSON(['id']), from: socket.id });
+        pushUndo();
+      });
+    }
+
+    function setCanvasTool(idSuffix, tool) {
+      const state = canvasStates[idSuffix];
+      if (!state) return;
+      state.tool = tool;
+      state.textMode = (tool === 'text');
+      const fc = state.fc;
+      ['select', 'pen', 'eraser', 'text'].forEach(t => {
+        const btn = document.getElementById('canvas-' + t + '-' + idSuffix);
+        if (btn) btn.classList.toggle('active', t === tool);
+      });
+      const color = document.getElementById('canvas-color-' + idSuffix);
+      const size = document.getElementById('canvas-size-' + idSuffix);
+      const colorVal = color ? color.value : '#ff6600';
+      const sizeVal = size ? parseInt(size.value) : 3;
+      if (tool === 'select') {
+        fc.isDrawingMode = false;
+        fc.selection = true;
+      } else if (tool === 'pen') {
+        fc.isDrawingMode = true;
+        fc.selection = false;
+        fc.freeDrawingBrush = new fabric.PencilBrush(fc);
+        fc.freeDrawingBrush.color = colorVal;
+        fc.freeDrawingBrush.width = sizeVal;
+      } else if (tool === 'eraser') {
+        fc.isDrawingMode = true;
+        fc.selection = false;
+        fc.freeDrawingBrush = new fabric.PencilBrush(fc);
+        fc.freeDrawingBrush.color = '#ffffff';
+        fc.freeDrawingBrush.width = sizeVal * 4;
+      } else if (tool === 'text') {
+        fc.isDrawingMode = false;
+        fc.selection = false;
+        fc.defaultCursor = 'text';
+      }
+    }
+
+    function setCanvasColor(idSuffix, color) {
+      const state = canvasStates[idSuffix];
+      if (!state || state.tool !== 'pen') return;
+      state.fc.freeDrawingBrush.color = color;
+    }
+
+    function setCanvasSize(idSuffix, size) {
+      const state = canvasStates[idSuffix];
+      if (!state || !state.fc.isDrawingMode) return;
+      const px = parseInt(size);
+      state.fc.freeDrawingBrush.width = state.tool === 'eraser' ? px * 4 : px;
+    }
+
+    function clearCanvas(artifactId) {
+      socket.emit('canvasClear', { artifactId });
+    }
+
+    function toggleCanvasImgMenu(idSuffix) {
+      const menu = document.getElementById('canvas-imgmenu-' + idSuffix);
+      if (menu) menu.classList.toggle('open');
+    }
+
+    function canvasImgFromUrl(idSuffix) {
+      const menu = document.getElementById('canvas-imgmenu-' + idSuffix);
+      if (menu) menu.classList.remove('open');
+      const url = prompt('Image URL:');
+      if (url && url.trim()) canvasAddImageFromUrl(idSuffix, url.trim());
+    }
+
+    function canvasUndo(idSuffix) {
+      const state = canvasStates[idSuffix];
+      if (!state || state.undoStack.length <= 1) return;
+      state.undoStack.pop(); // remove current state
+      const prev = state.undoStack[state.undoStack.length - 1];
+      state.fc.loadFromJSON(prev, () => {
+        state.fc.renderAll();
+        socket.emit('canvasSave', { artifactId: state.artifactId, dataUrl: prev, sync: true });
+      });
+    }
+
+    function canvasBringForward(idSuffix) {
+      const state = canvasStates[idSuffix];
+      if (!state) return;
+      const obj = state.fc.getActiveObject();
+      if (obj) { state.fc.bringForward(obj); state.fc.renderAll(); }
+    }
+
+    function canvasSendBackward(idSuffix) {
+      const state = canvasStates[idSuffix];
+      if (!state) return;
+      const obj = state.fc.getActiveObject();
+      if (obj) { state.fc.sendBackwards(obj); state.fc.renderAll(); }
+    }
+
+    // Close img dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      document.querySelectorAll('.canvas-img-menu.open').forEach(menu => {
+        if (!menu.parentElement.contains(e.target)) menu.classList.remove('open');
+      });
+      // Close canvas context menu
+      const ctxMenu = document.getElementById('canvasContextMenu');
+      if (ctxMenu && !ctxMenu.contains(e.target)) ctxMenu.classList.remove('open');
+    });
+
+    // Canvas right-click context menu
+    let canvasContextTarget = null;
+    document.addEventListener('contextmenu', (e) => {
+      const wrap = e.target.closest('.canvas-inline-wrap');
+      if (!wrap) return;
+      const artifactId = wrap.id.replace('canvas-wrap-', '');
+      const state = canvasStates[artifactId];
+      if (!state) return;
+      e.preventDefault();
+      canvasContextTarget = state;
+      const menu = document.getElementById('canvasContextMenu');
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      menu.classList.add('open');
+    });
+
+    function canvasContextSave() {
+      const menu = document.getElementById('canvasContextMenu');
+      menu.classList.remove('open');
+      if (!canvasContextTarget) return;
+      const dataUrl = canvasContextTarget.fc.toDataURL({ format: 'png', multiplier: 1 });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'canvas.png';
+      a.click();
+    }
+
+    // ---- Canvas: paste image ----
+    // Track last canvas the user clicked on (more reliable than activeElement)
+    let lastActiveCanvasId = null;
+
+    document.addEventListener('paste', (e) => {
+      if (e.defaultPrevented) return;
+      // Don't intercept when a text field has focus
+      const active = document.activeElement;
+      if (active && active.tagName === 'TEXTAREA') return;
+      if (active && active.tagName === 'INPUT') return;
+      // Need a canvas the user has recently clicked
+      if (!lastActiveCanvasId) return;
+      const wrap = document.getElementById('canvas-wrap-' + lastActiveCanvasId);
+      if (!wrap) return; // canvas no longer in DOM (note switched)
+      const state = canvasStates[lastActiveCanvasId];
+      if (!state) return;
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const blob = item.getAsFile();
+          const canvasId = lastActiveCanvasId;
+          uploadFile(blob).then(result => {
+            if (result && result.url) canvasAddImageFromUrl(canvasId, result.url);
+          });
+          break;
+        }
+      }
+    });
+
+    // ---- Canvas drag-drop: no-op placeholder (handled by document-level listener below) ----
+    function initCanvasDragDrop(idSuffix) { /* handled globally */ }
+
+    // ---- Pending files for message bar ----
+    let pendingChatFiles = []; // [{ file, blobUrl, name, isImage }]
+
+    function addPendingFile(file) {
+      const isImage = file.type.startsWith('image/');
+      const blobUrl = isImage ? URL.createObjectURL(file) : null;
+      const name = file.name || (isImage ? 'pasted-image.png' : 'file');
+      const id = 'pf-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      pendingChatFiles.push({ id, file, blobUrl, name, isImage });
+      renderPendingFiles();
+    }
+
+    function removePendingFile(id) {
+      pendingChatFiles = pendingChatFiles.filter(f => f.id !== id);
+      renderPendingFiles();
+    }
+
+    function renderPendingFiles() {
+      const strip = document.getElementById('chatPendingFiles');
+      strip.innerHTML = '';
+      pendingChatFiles.forEach(pf => {
+        const div = document.createElement('div');
+        div.className = 'chat-pending-file';
+        const preview = pf.isImage
+          ? `<img src="${pf.blobUrl}" alt="">`
+          : `<div class="file-icon">⊞</div>`;
+        div.innerHTML = `${preview}<span class="file-name">${escapeHtml(pf.name)}</span><button class="remove-pending" onclick="removePendingFile('${pf.id}')" title="Remove">✕</button>`;
+        strip.appendChild(div);
+      });
+    }
+
+    // ---- Message bar: paste image ----
+    document.getElementById('chatInput').addEventListener('paste', (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          e.stopPropagation();
+          addPendingFile(item.getAsFile());
+          break;
+        }
+      }
+    });
+
+    // ---- Document-level drag-and-drop: handles canvas and message bar ----
+    const chatInputArea = document.querySelector('.chat-input-area');
+
+    document.addEventListener('dragenter', (e) => { e.preventDefault(); });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const overCanvas = e.target.closest('.canvas-inline-wrap');
+      const overChat = e.target.closest('.chat-input-area');
+      document.querySelectorAll('.canvas-inline-wrap').forEach(w => {
+        w.style.outline = overCanvas === w ? '2px solid var(--amber)' : '';
+      });
+      if (chatInputArea) chatInputArea.classList.toggle('drag-over', !!overChat);
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      if (e.relatedTarget) return;
+      document.querySelectorAll('.canvas-inline-wrap').forEach(w => { w.style.outline = ''; });
+      if (chatInputArea) chatInputArea.classList.remove('drag-over');
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      document.querySelectorAll('.canvas-inline-wrap').forEach(w => { w.style.outline = ''; });
+      if (chatInputArea) chatInputArea.classList.remove('drag-over');
+
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length) return;
+
+      const canvasWrap = e.target.closest('.canvas-inline-wrap');
+      if (canvasWrap) {
+        const idSuffix = canvasWrap.id.replace('canvas-wrap-', '');
+        files.filter(f => f.type.startsWith('image/')).forEach(f => canvasAddImageFromUrl(idSuffix, URL.createObjectURL(f)));
+        return;
+      }
+
+      if (e.target.closest('.chat-input-area')) {
+        files.forEach(addPendingFile);
+      }
+    });
+
+    function canvasAddImageFromUrl(idSuffix, src) {
+      const state = canvasStates[idSuffix];
+      if (!state) return;
+      const fc = state.fc;
+      fabric.Image.fromURL(src, (img) => {
+        if (!img) return;
+        const maxW = fc.width * 0.5;
+        if (img.width > maxW) img.scaleToWidth(maxW);
+        img.set({ left: 50, top: 50 });
+        img.id = generateId();
+        fc.add(img);
+        fc.setActiveObject(img);
+        fc.renderAll();
+        setCanvasTool(idSuffix, 'select');
+        socket.emit('canvasObjectAdded', {
+          artifactId: state.artifactId,
+          object: img.toJSON(['id']),
+          from: socket.id
+        });
+        if (state.autoSave) state.autoSave();
+      }, { crossOrigin: 'anonymous' });
+    }
+
+    // ============================================
+    // FILE UPLOAD
+    // ============================================
+
+    // Upload from artifact menu → post as file artifact in chat
+    function triggerImageUpload() {
+      document.getElementById('artifactMenu').classList.remove('open');
+      document.getElementById('imageUploadInput').value = '';
+      document.getElementById('imageUploadInput').click();
+    }
+
+    async function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const result = await uploadFile(file);
+      if (!result) return;
+      socket.emit('createArtifact', {
+        name: file.name,
+        type: 'file',
+        content: result.url,
+        comment: 'uploaded: ' + file.name
+      });
+    }
+
+    // Upload for canvas toolbar
+    function triggerCanvasUpload(idSuffix) {
+      const menu = document.getElementById('canvas-imgmenu-' + idSuffix);
+      if (menu) menu.classList.remove('open');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const result = await uploadFile(file);
+        if (result) canvasAddImageFromUrl(idSuffix, result.url);
+      };
+      input.click();
+    }
+
+    // Core upload helper — POST file, return { url, originalName, mimetype }
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!data.success) { alert('Upload failed: ' + data.message); return null; }
+        return data;
+      } catch (err) {
+        alert('Upload error: ' + err.message);
+        return null;
+      }
+    }
+
     // Track lightbike game states
     let lightbikeGames = {};
     
@@ -4725,10 +5609,59 @@ export { authenticateUser };`
       `;
       
       const contentEl = document.getElementById('fullscreenContent');
-      
-      if (artifact.type === 'image') {
+      contentEl.style.alignItems = '';
+      contentEl.style.overflow = '';
+
+      if (artifact.type === 'image' || (artifact.type === 'file' && isImageUrl(content))) {
         contentEl.innerHTML = `<img src="${escapeHtml(content)}">`;
         contentEl.className = 'artifact-fullscreen-content';
+      } else if (artifact.type === 'file') {
+        const filename = artifact.name || content.split('/').pop();
+        const ext = filename.split('.').pop().toLowerCase();
+        const url = escapeHtml(content);
+        const name = escapeHtml(filename);
+        const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'];
+        const videoExts = ['mp4', 'webm', 'mov', 'mkv', 'avi'];
+        const textExts  = ['txt', 'csv', 'json', 'xml', 'yaml', 'yml', 'md', 'log'];
+        let fsHtml = '';
+        if (audioExts.includes(ext)) {
+          fsHtml = `<audio controls style="width:80%;"><source src="${url}">Your browser does not support audio.</audio>`;
+        } else if (videoExts.includes(ext)) {
+          fsHtml = `<video controls style="width:100%;max-height:80vh;background:#000;"><source src="${url}">Your browser does not support video.</video>`;
+        } else if (ext === 'pdf') {
+          fsHtml = `<iframe src="${url}" style="width:100%;height:85vh;border:none;"></iframe>`;
+        } else if (ext === 'docx') {
+          contentEl.style.alignItems = 'flex-start';
+          fsHtml = `<div id="fs-docx-preview" style="width:100%;max-width:900px;background:#fff;color:#111;padding:2rem;font-size:0.95rem;line-height:1.6;">Loading...</div>`;
+        } else if (textExts.includes(ext)) {
+          fsHtml = `<pre id="fs-text-preview" style="max-width:900px;width:100%;color:#bbb;font-size:0.9rem;white-space:pre-wrap;overflow:auto;max-height:85vh;">Loading...</pre>`;
+        } else {
+          fsHtml = `<div style="text-align:center;padding:2rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">⊞</div>
+            <div style="color:#aaa;margin-bottom:1rem;">${name}</div>
+            <div style="color:#555;margin-bottom:1.5rem;font-size:0.85rem;">No preview available for .${escapeHtml(ext)} files</div>
+            <a href="${url}" download="${name}" style="color:var(--amber);font-family:monospace;">↓ DOWNLOAD</a>
+          </div>`;
+        }
+        contentEl.innerHTML = fsHtml;
+        contentEl.className = 'artifact-fullscreen-content';
+        if (ext === 'docx') {
+          fetch('/api/preview/docx?path=' + encodeURIComponent(content)).then(r => r.json()).then(data => {
+            const el = document.getElementById('fs-docx-preview');
+            if (el) el.innerHTML = data.html || '<em>Empty document</em>';
+          }).catch(() => {
+            const el = document.getElementById('fs-docx-preview');
+            if (el) el.textContent = 'Could not load preview.';
+          });
+        } else if (textExts.includes(ext)) {
+          fetch(content).then(r => r.text()).then(t => {
+            const el = document.getElementById('fs-text-preview');
+            if (el) el.textContent = t;
+          }).catch(() => {
+            const el = document.getElementById('fs-text-preview');
+            if (el) el.textContent = 'Could not load file.';
+          });
+        }
       } else if (artifact.type === 'lightbike') {
         contentEl.innerHTML = `
           <div class="lightbike-game-container-fullscreen">
@@ -4749,10 +5682,12 @@ export { authenticateUser };`
         contentEl.className = 'artifact-fullscreen-content';
       }
       
+      document.documentElement.style.overflow = 'hidden';
       document.getElementById('artifactFullscreen').classList.add('open');
     }
-    
+
     function closeFullscreen() {
+      document.documentElement.style.overflow = '';
       document.getElementById('artifactFullscreen').classList.remove('open');
       currentFullscreenArtifactId = null;
     }
@@ -4858,6 +5793,11 @@ export { authenticateUser };`
       document.getElementById('rightResizeHandle').style.display = 'none';
       currentOpenArtifactId = null;
     }
+
+    function deleteArtifact(artifactId) {
+      if (!confirm('Delete this artifact? This cannot be undone.')) return;
+      socket.emit('deleteArtifact', { artifactId });
+    }
     
     function editArtifact(id) {
       const artifact = artifacts[id];
@@ -4869,24 +5809,21 @@ export { authenticateUser };`
       const title = document.getElementById('modalTitle');
       const languageField = document.getElementById('languageField');
       const contentField = document.getElementById('contentField');
-      const imageField = document.getElementById('imageField');
       const submitBtn = document.querySelector('.modal-submit-btn');
-      
+
       // Set modal title
       title.textContent = 'Edit: ' + artifact.name;
       submitBtn.textContent = 'SAVE';
-      
+
       // Configure modal based on type
       if (artifact.type === 'markdown') {
         currentArtifactType = 'markdown';
         languageField.style.display = 'none';
         contentField.style.display = 'flex';
-        imageField.style.display = 'none';
       } else {
         currentArtifactType = 'code';
         languageField.style.display = 'flex';
         contentField.style.display = 'flex';
-        imageField.style.display = 'none';
         document.getElementById('artifactLanguage').value = artifact.type;
       }
       
