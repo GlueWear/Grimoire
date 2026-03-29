@@ -9,12 +9,16 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
   <script src="/urbit-ob-browser.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Share+Tech+Mono&display=swap');
     
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+    }
+
+    html {
+      font-size: 13px;
     }
     
     :root {
@@ -24,13 +28,36 @@
       --green-glow: rgba(0, 255, 136, 0.6);
       --blue: #00ddff;
       --blue-glow: rgba(0, 221, 255, 0.6);
-      --bg-dark: #0a0a0a;
+      --bg-dark: #181818;
       --text-main: #cccccc;
-      --scanline: rgba(0, 0, 0, 0.3);
     }
     
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #444 transparent;
+    }
+
+    *::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    *::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 2px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+      background: #666;
+    }
+
     body {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
       background: var(--bg-dark);
       min-height: 100vh;
       display: flex;
@@ -40,44 +67,6 @@
       color: var(--text-main);
     }
     
-    /* CRT scanline effect */
-    body::before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: repeating-linear-gradient(
-        0deg,
-        var(--scanline) 0px,
-        var(--scanline) 1px,
-        transparent 1px,
-        transparent 3px
-      );
-      pointer-events: none;
-      z-index: 1000;
-      opacity: 0.3;
-    }
-    
-    /* Subtle flicker */
-    body::after {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 255, 136, 0.015);
-      pointer-events: none;
-      z-index: 999;
-      animation: flicker 0.1s infinite;
-    }
-    
-    @keyframes flicker {
-      0%, 100% { opacity: 0.97; }
-      50% { opacity: 1; }
-    }
     
     .container {
       width: 100%;
@@ -93,13 +82,6 @@
       margin-left: 0.3em; /* Compensate for letter-spacing on last letter */
       margin-bottom: 0.5rem;
       color: var(--amber);
-      text-shadow: 0 0 10px var(--amber-glow), 0 0 20px var(--amber-glow), 0 0 40px var(--amber-glow);
-      animation: glow-pulse 3s ease-in-out infinite;
-    }
-    
-    @keyframes glow-pulse {
-      0%, 100% { text-shadow: 0 0 10px var(--amber-glow), 0 0 20px var(--amber-glow), 0 0 40px var(--amber-glow); }
-      50% { text-shadow: 0 0 15px var(--amber-glow), 0 0 30px var(--amber-glow), 0 0 60px var(--amber-glow); }
     }
     
     .tagline {
@@ -129,7 +111,7 @@
     }
     
     .login-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.4rem;
       padding: 1rem 2rem;
       border: 2px solid;
@@ -163,7 +145,6 @@
     
     .login-btn.urbit:hover {
       background: rgba(255, 176, 0, 0.15);
-      box-shadow: 0 0 20px var(--amber-glow), inset 0 0 20px rgba(255, 176, 0, 0.1);
     }
     
     .login-btn.visitor {
@@ -173,7 +154,6 @@
     
     .login-btn.visitor:hover {
       background: rgba(0, 212, 255, 0.15);
-      box-shadow: 0 0 20px var(--blue-glow), inset 0 0 20px rgba(0, 212, 255, 0.1);
     }
     
     .login-btn.agent {
@@ -183,7 +163,6 @@
     
     .login-btn.agent:hover {
       background: rgba(0, 255, 65, 0.15);
-      box-shadow: 0 0 20px var(--green-glow), inset 0 0 20px rgba(0, 255, 65, 0.1);
     }
     
     /* Name input screen */
@@ -217,7 +196,7 @@
     }
     
     .azimuth-point-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.2rem;
       padding: 0.75rem 1rem;
       background: transparent;
@@ -242,7 +221,7 @@
     }
     
     .back-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       color: #666;
       background: none;
@@ -284,7 +263,7 @@
     }
     
     .name-prefix {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.5rem;
       padding: 0.75rem;
       padding-right: 0;
@@ -300,7 +279,7 @@
     }
     
     .name-input {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.5rem;
       padding: 0.75rem;
       padding-left: 0.25rem;
@@ -328,7 +307,7 @@
     }
     
     .enter-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.4rem;
       padding: 1rem 3rem;
       border: 2px solid;
@@ -346,7 +325,6 @@
     
     .enter-btn.urbit:hover:not(:disabled) {
       background: rgba(255, 170, 0, 0.15);
-      box-shadow: 0 0 20px var(--amber-glow);
     }
     
     .enter-btn.visitor {
@@ -356,7 +334,6 @@
     
     .enter-btn.visitor:hover:not(:disabled) {
       background: rgba(0, 221, 255, 0.15);
-      box-shadow: 0 0 20px var(--blue-glow);
     }
     
     .enter-btn.agent {
@@ -366,7 +343,6 @@
     
     .enter-btn.agent:hover:not(:disabled) {
       background: rgba(0, 255, 136, 0.15);
-      box-shadow: 0 0 20px var(--green-glow);
     }
     
     .enter-btn:disabled {
@@ -401,9 +377,8 @@
       font-size: 1.5rem;
       color: var(--amber);
       letter-spacing: 0.2em;
-      text-shadow: 0 0 10px var(--amber-glow);
     }
-    
+
     .user-info {
       display: flex;
       align-items: center;
@@ -416,21 +391,18 @@
     
     .user-name.urbit {
       color: var(--amber);
-      text-shadow: 0 0 8px var(--amber-glow);
     }
-    
+
     .user-name.visitor {
       color: var(--blue);
-      text-shadow: 0 0 8px var(--blue-glow);
     }
-    
+
     .user-name.agent {
       color: var(--green);
-      text-shadow: 0 0 8px var(--green-glow);
     }
     
     .logout-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.4rem 0.8rem;
       background: transparent;
@@ -474,10 +446,17 @@
       width: 220px;
       min-width: 150px;
       max-width: 400px;
-      background: #0d0d0d;
+      background: #181818;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
     .sidebar-header {
@@ -497,7 +476,7 @@
     }
     
     .new-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.85rem;
       padding: 0.3rem 0.5rem;
       background: transparent;
@@ -509,11 +488,10 @@
     
     .new-btn:hover {
       background: rgba(255, 170, 0, 0.15);
-      box-shadow: 0 0 10px var(--amber-glow);
     }
     
     .launch-agent-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.85rem;
       padding: 0.3rem 0.5rem;
       background: transparent;
@@ -525,7 +503,6 @@
     
     .launch-agent-btn:hover {
       background: rgba(0, 255, 136, 0.15);
-      box-shadow: 0 0 10px var(--green-glow);
     }
     
     .sidebar-section {
@@ -546,7 +523,7 @@
     }
     
     .sidebar-section-header:hover {
-      background: #161616;
+      background: #2a2a2a;
     }
     
     .section-arrow {
@@ -581,12 +558,8 @@
       display: block;
     }
     
-    .sidebar-spacer {
-      flex: 1;
-    }
-    
     .sidebar-section-title {
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       color: #555;
       letter-spacing: 0.1em;
     }
@@ -594,7 +567,7 @@
     /* Cover note (Ars Notoria) */
     .cover-note {
       padding: 0.6rem 1rem;
-      color: var(--amber);
+      color: #999;
       cursor: pointer;
       border-bottom: 1px solid #1a1a1a;
       transition: all 0.15s;
@@ -603,16 +576,17 @@
     }
     
     .cover-note .note-item-name {
-      font-size: 1.1rem;
+      font-size: 1rem;
     }
     
     .cover-note:hover {
-      background: #161616;
+      background: #2a2a2a;
     }
     
     .cover-note.active {
-      background: #1a1a1a;
+      background: #2a2a2a;
       border-left: 2px solid var(--amber);
+      color: var(--amber);
     }
     
     .user-counts {
@@ -645,18 +619,23 @@
       cursor: pointer;
       transition: all 0.15s;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0.3rem;
       position: relative;
     }
     
     .note-item:hover {
-      background: #161616;
+      background: #2a2a2a;
       color: #ccc;
     }
     
     .note-item.active {
-      background: #1a1a1a;
+      background: #2a2a2a;
+      color: var(--amber);
+    }
+
+    .note-item.active .note-item-name,
+    .cover-note.active .note-item-name {
       color: var(--amber);
     }
     
@@ -691,23 +670,70 @@
       display: block;
     }
     
+    .note-avatar {
+      width: 3.5rem;
+      height: 3.5rem;
+      background: #000;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: #bbb;
+      flex-shrink: 0;
+      letter-spacing: 0;
+    }
+
+    .note-item-content {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 0.1rem;
+    }
+
+    .note-item-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .note-item-source {
+      font-size: 0.85rem;
+      color: #bbb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .note-item-preview {
+      font-size: 0.8rem;
+      color: #bbb;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+
+    .note-item-preview-author {
+      color: #bbb;
+    }
+
     .note-item-name {
       flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      font-size: 1rem;
+      color: #ddd;
     }
     
-    .note-item-name.urbit {
+    .note-item.active .note-item-name.urbit,
+    .note-item.active .note-item-name.visitor,
+    .note-item.active .note-item-name.agent {
       color: var(--amber);
-    }
-    
-    .note-item-name.visitor {
-      color: var(--blue);
-    }
-    
-    .note-item-name.agent {
-      color: var(--green);
     }
     
     /* Nested notes */
@@ -730,7 +756,7 @@
     }
     
     .sidebar-item:hover {
-      background: #161616;
+      background: #2a2a2a;
       color: #ccc;
     }
     
@@ -779,7 +805,7 @@
     /* Context Menu */
     .context-menu {
       position: fixed;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       min-width: 160px;
       z-index: 1000;
@@ -837,7 +863,7 @@
       align-items: center;
       gap: 0.75rem;
       padding: 0.5rem 0.75rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #222;
       cursor: pointer;
       transition: all 0.15s;
@@ -901,7 +927,7 @@
       margin-top: auto;
       padding: 1rem;
       padding-top: 1.5rem;
-      background: #0d0d0d;
+      background: #181818;
       border-top: 1px solid #222;
     }
     
@@ -912,9 +938,9 @@
       width: 100%;
       height: 38px;
       padding: 0 0.75rem;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.1rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #2a2a2a;
       color: var(--amber);
       cursor: pointer;
@@ -945,7 +971,7 @@
     }
     
     .wallet-panel {
-      background: #0d0d0d;
+      background: #181818;
       border: 1px solid #333;
       width: 350px;
       max-height: 80vh;
@@ -992,7 +1018,7 @@
     }
     
     .wallet-connect-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.75rem 1.5rem;
       background: transparent;
@@ -1049,7 +1075,7 @@
       word-break: break-all;
       margin-top: 0.5rem;
       padding: 0.5rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
     }
     
@@ -1101,7 +1127,7 @@
     .wallet-action-btn {
       flex: 1;
       padding: 0.5rem;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       background: #1a1a1a;
       border: 1px solid #333;
@@ -1142,7 +1168,7 @@
     
     .wallet-transaction {
       padding: 0.5rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #1a1a1a;
       font-size: 0.85rem;
     }
@@ -1194,7 +1220,7 @@
     }
     
     .wallet-modal {
-      background: #0d0d0d;
+      background: #181818;
       border: 1px solid #333;
       width: 300px;
     }
@@ -1226,9 +1252,9 @@
     .wallet-modal-field input {
       width: 100%;
       padding: 0.5rem;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       color: #ccc;
       box-sizing: border-box;
@@ -1249,7 +1275,7 @@
     .wallet-cancel-btn, .wallet-confirm-btn {
       flex: 1;
       padding: 0.5rem;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       cursor: pointer;
       transition: all 0.15s;
@@ -1279,7 +1305,7 @@
     /* Contract options */
     .contract-option {
       padding: 0.75rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #222;
       margin-bottom: 0.5rem;
       cursor: pointer;
@@ -1344,7 +1370,7 @@
     }
     
     .invite-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.3rem 0.6rem;
       background: transparent;
@@ -1355,9 +1381,6 @@
       transition: all 0.2s;
     }
     
-    .invite-btn:hover {
-      text-shadow: 0 0 8px var(--amber-glow);
-    }
     
     .chat-messages {
       flex: 1;
@@ -1365,13 +1388,21 @@
       padding: 1rem;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0;
+    }
+
+    .message + .message {
+      margin-top: 0;
+    }
+
+    .message + .message-grouped {
+      margin-top: 0;
     }
     
     .message {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0;
       position: relative;
     }
     
@@ -1398,7 +1429,7 @@
     }
     
     .thread-expand {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.85rem;
       color: #666;
       cursor: pointer;
@@ -1422,7 +1453,7 @@
     }
     
     .message-action-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       padding: 0.2rem 0.5rem;
       background: transparent;
@@ -1443,9 +1474,33 @@
       gap: 0.5rem;
     }
     
+    .message-grouped .message-header {
+      display: none;
+    }
+
+    .message-grouped .message-body,
+    .message-grouped .message-quote {
+      margin-top: 0;
+    }
+
+    .message-avatar {
+      width: 2rem;
+      height: 2rem;
+      background: #000;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      color: #bbb;
+      flex-shrink: 0;
+      letter-spacing: 0;
+    }
+
     .message-author {
       font-size: 1rem;
       font-weight: normal;
+      color: #ddd;
     }
     
     .message-author.urbit {
@@ -1466,11 +1521,10 @@
     }
     
     .message-body {
-      color: #bbb;
+      color: #ddd;
       font-size: 1rem;
-      line-height: 1.5;
-      padding-left: 0;
-      text-indent: 2rem;
+      line-height: 1.3;
+      padding-left: 2.5rem;
     }
     
     .message-body code {
@@ -1501,10 +1555,10 @@
     .message-quote {
       border-left: 2px solid #444;
       padding-left: 0.75rem;
+      margin-left: 2.5rem;
       margin-bottom: 0.5rem;
       color: #777;
       font-size: 0.9rem;
-      text-indent: 0;
     }
     
     .message-quote-author {
@@ -1586,7 +1640,7 @@
     .reply-indicator {
       display: none;
       padding: 0.5rem 0.75rem;
-      background: #111;
+      background: #181818;
       border-bottom: 1px solid #222;
       font-size: 0.85rem;
       color: #888;
@@ -1619,7 +1673,7 @@
     .quote-indicator {
       display: none;
       padding: 0.5rem 0.75rem;
-      background: #111;
+      background: #181818;
       border-bottom: 1px solid #222;
       border-left: 2px solid #444;
       margin-left: 0.5rem;
@@ -1661,7 +1715,7 @@
       position: absolute;
       bottom: 100%;
       left: 0;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       min-width: 150px;
       max-height: 150px;
@@ -1697,7 +1751,7 @@
     
     /* Artifact card in chat */
     .artifact-card {
-      background: #111;
+      background: #181818;
       border: 1px solid #2a2a2a;
       border-left: 3px solid var(--amber);
       padding: 0.75rem 1rem;
@@ -1711,7 +1765,7 @@
     }
     
     .artifact-card:hover {
-      background: #161616;
+      background: #2a2a2a;
       border-color: #333;
     }
     
@@ -1751,7 +1805,7 @@
     }
     
     .artifact-preview-code {
-      background: #111;
+      background: #181818;
       border: 1px solid #2a2a2a;
       padding: 0.5rem 0.75rem;
       margin-top: 0.5rem;
@@ -1763,7 +1817,7 @@
       cursor: pointer;
       transition: border-color 0.15s;
       white-space: pre-wrap;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
     }
     
     .artifact-preview-code:hover {
@@ -1771,7 +1825,7 @@
     }
     
     .artifact-preview-markdown {
-      background: #111;
+      background: #181818;
       border: 1px solid #2a2a2a;
       padding: 0.5rem 0.75rem;
       margin-top: 0.5rem;
@@ -1793,7 +1847,7 @@
        ============================================ */
     
     .artifact-inline {
-      background: #0a0a0a;
+      background: #181818;
       border: 1px solid #2a2a2a;
       margin-top: 0.5rem;
       max-width: 500px;
@@ -1806,7 +1860,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.4rem 0.6rem;
-      background: #111;
+      background: #181818;
       border-bottom: 1px solid #222;
       font-size: 0.85rem;
     }
@@ -1836,7 +1890,7 @@
     }
     
     .artifact-inline-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.8rem;
       padding: 0.15rem 0.4rem;
       background: transparent;
@@ -1852,7 +1906,7 @@
     }
 
     .artifact-delete-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.8rem;
       padding: 0.15rem 0.4rem;
       background: transparent;
@@ -1880,7 +1934,7 @@
     
     .artifact-inline-content pre {
       margin: 0;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       color: #bbb;
       white-space: pre-wrap;
@@ -1917,7 +1971,7 @@
       position: absolute;
       top: 0.25rem;
       right: 0.25rem;
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       padding: 0.2rem 0.4rem;
       background: rgba(0, 0, 0, 0.7);
@@ -1964,7 +2018,7 @@
     
     .artifact-inline.lightbike .artifact-inline-content {
       padding: 0;
-      background: #000;
+      background: #181818;
       max-height: none;
       overflow: visible;
       width: fit-content;
@@ -1972,7 +2026,7 @@
     
     .lightbike-setup {
       padding: 0.5rem;
-      background: #0a0a0a;
+      background: #181818;
       border-bottom: 1px solid #222;
     }
     
@@ -1994,10 +2048,10 @@
     }
     
     .lightbike-select {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.85rem;
       padding: 0.2rem 0.4rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       color: #ccc;
       cursor: pointer;
@@ -2035,12 +2089,12 @@
       display: flex;
       gap: 0.5rem;
       padding: 0.5rem;
-      background: #111;
+      background: #181818;
       border-top: 1px solid #222;
     }
     
     .lightbike-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.85rem;
       padding: 0.3rem 0.6rem;
       background: transparent;
@@ -2093,7 +2147,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0.75rem 1rem;
-      background: #0d0d0d;
+      background: #181818;
       border-bottom: 1px solid #333;
     }
     
@@ -2111,7 +2165,7 @@
     }
     
     .artifact-fullscreen-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.4rem 0.75rem;
       background: transparent;
@@ -2141,7 +2195,7 @@
     }
     
     .artifact-fullscreen-content pre {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       color: #bbb;
       white-space: pre-wrap;
@@ -2172,7 +2226,7 @@
     
     .lightbike-setup-fullscreen {
       padding: 1rem;
-      background: #0a0a0a;
+      background: #181818;
       border: 1px solid #222;
       margin-bottom: 1rem;
       min-width: 300px;
@@ -2208,7 +2262,7 @@
       display: flex;
       gap: 0.4rem;
       padding: 0.35rem 0.5rem;
-      background: #111;
+      background: #181818;
       border-bottom: 1px solid #222;
       align-items: center;
     }
@@ -2363,7 +2417,7 @@
     .chat-input-area {
       padding: 1rem;
       border-top: 1px solid #222;
-      background: #0d0d0d;
+      background: #181818;
     }
 
     .chat-input-area.drag-over {
@@ -2439,7 +2493,7 @@
       display: flex;
       align-items: flex-end;
       gap: 0.5rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #2a2a2a;
       padding: 0.5rem 0.75rem;
       min-height: 38px;
@@ -2452,8 +2506,8 @@
     
     .chat-input {
       flex: 1;
-      font-family: 'VT323', monospace;
-      font-size: 1.1rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1rem;
       background: transparent;
       border: none;
       outline: none;
@@ -2474,7 +2528,7 @@
     }
     
     .chat-action-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       padding: 0.3rem 0.5rem;
       background: transparent;
@@ -2490,7 +2544,7 @@
     }
     
     .chat-send-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.3rem 0.75rem;
       background: transparent;
@@ -2509,7 +2563,7 @@
       width: 0;
       min-width: 0;
       max-width: 600px;
-      background: #0d0d0d;
+      background: #181818;
       overflow: hidden;
       transition: width 0.25s ease;
       display: flex;
@@ -2541,7 +2595,7 @@
     }
     
     .artifact-close-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.2rem;
       background: transparent;
       border: none;
@@ -2570,7 +2624,7 @@
     }
     
     .edit-artifact-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 0.9rem;
       padding: 0.3rem 0.75rem;
       background: transparent;
@@ -2598,7 +2652,7 @@
     }
     
     .artifact-viewer-content pre {
-      background: #0a0a0a;
+      background: #181818;
       padding: 1rem;
       overflow-x: auto;
       border: 1px solid #1a1a1a;
@@ -2619,7 +2673,7 @@
       position: absolute;
       bottom: 100%;
       left: 0;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       margin-bottom: 0.5rem;
       min-width: 140px;
@@ -2630,7 +2684,7 @@
     }
     
     .artifact-menu-item {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       width: 100%;
       padding: 0.5rem 0.75rem;
@@ -2666,7 +2720,7 @@
     }
     
     .modal {
-      background: #0d0d0d;
+      background: #181818;
       border: 1px solid #333;
       width: 100%;
       max-width: 500px;
@@ -2689,7 +2743,7 @@
     }
     
     .modal-close-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.2rem;
       background: transparent;
       border: none;
@@ -2723,10 +2777,10 @@
     }
     
     .modal-input {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.1rem;
       padding: 0.5rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       color: #ccc;
       outline: none;
@@ -2737,20 +2791,20 @@
     }
     
     .modal-select {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1.1rem;
       padding: 0.5rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       color: #ccc;
       outline: none;
     }
     
     .modal-textarea {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.75rem;
-      background: #111;
+      background: #181818;
       border: 1px solid #333;
       color: #ccc;
       outline: none;
@@ -2771,7 +2825,7 @@
     }
     
     .modal-cancel-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.5rem 1rem;
       background: transparent;
@@ -2787,7 +2841,7 @@
     }
     
     .modal-submit-btn {
-      font-family: 'VT323', monospace;
+      font-family: 'IBM Plex Mono', monospace;
       font-size: 1rem;
       padding: 0.5rem 1rem;
       background: transparent;
@@ -2878,7 +2932,8 @@
           <span class="user-counts" id="arsNotoriaUserCounts"></span>
         </div>
         
-        <!-- Collapsible sections -->
+        <!-- Collapsible sections (scrollable) -->
+        <div class="sidebar-scroll">
         <div class="sidebar-section collapsible">
           <div class="sidebar-section-header" onclick="toggleSection('shared')">
             <span class="section-arrow" id="sharedArrow">▶</span>
@@ -2901,8 +2956,6 @@
           </div>
         </div>
         
-        <div class="sidebar-spacer"></div>
-        
         <div class="sidebar-section collapsible">
           <div class="sidebar-section-header" onclick="toggleSection('agents')">
             <span class="section-arrow" id="agentsArrow">▶</span>
@@ -2912,7 +2965,8 @@
             <div class="agents-list" id="agentsList"></div>
           </div>
         </div>
-        
+        </div><!-- end sidebar-scroll -->
+
         <div class="wallet-btn-container">
           <button class="wallet-btn" onclick="toggleWallet()">WALLET</button>
         </div>
@@ -3010,7 +3064,7 @@
         </div>
         <div class="modal-field" id="lightbikeField" style="display: none;">
           <label class="modal-label">Game Settings</label>
-          <div style="color: #666; font-size: 0.9rem; padding: 0.5rem; background: #111; border: 1px solid #222;">
+          <div style="color: #666; font-size: 0.9rem; padding: 0.5rem; background: #181818; border: 1px solid #222;">
             Arena: 50×50 grid<br>
             Speed: 5 moves/sec<br>
             Players: You vs Agent
@@ -3522,6 +3576,9 @@
         }
       }
       
+      // Update sidebar preview for all notes
+      renderNotesList();
+
       // Only render if we're viewing this note
       if (noteId === currentNoteId) {
         renderMessage(msg);
@@ -3566,10 +3623,13 @@
       }
       
       renderNotesList();
-      
+
       // Open the newly created note (only for creator)
       if (isCreator) {
         openNote(note.id);
+        // Scroll the new note into view in the sidebar
+        const noteEl = document.querySelector(`[data-note-id="${note.id}"]`);
+        if (noteEl) noteEl.scrollIntoView({ block: 'nearest' });
       }
     });
     
@@ -3715,11 +3775,12 @@
       }
       
       const messageDiv = document.createElement('div');
-      messageDiv.className = 'message';
+      messageDiv.className = 'message' + (shouldGroup(lastRenderedMsg, msg) ? ' message-grouped' : '');
       messageDiv.id = msg.id;
       messageDiv.setAttribute('data-author', msg.author);
       messageDiv.setAttribute('data-author-type', msg.authorType);
       messageDiv.setAttribute('data-text', msg.text);
+      lastRenderedMsg = { author: msg.author, time: msg.time };
       
       let quoteHtml = '';
       if (msg.quote) {
@@ -3756,6 +3817,7 @@
       
       messageDiv.innerHTML = `
         <div class="message-header">
+          <span class="message-avatar">${getInitials(msg.author)}</span>
           <span class="message-author ${msg.authorType}">${formatName(msg.author)}</span>
           <span class="message-time">${msg.time}</span>
           <div class="message-actions">
@@ -3889,6 +3951,7 @@
     let noteNotifications = {}; // Track notifications: { noteId: true/false }
     let notificationOrder = []; // Track order of notifications (oldest first)
     let expandedNotes = {}; // Track which notes are expanded: { noteId: true/false }
+    let lastRenderedMsg = null; // { author, time } for grouping consecutive messages
     
     function handleChatEnter(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
@@ -4136,6 +4199,7 @@
       replyDiv.setAttribute('data-text', rawText);
       replyDiv.innerHTML = `
         <div class="message-header">
+          <span class="message-avatar">${getInitials(session.name)}</span>
           <span class="message-author ${session.type}">${formatName(session.name)}</span>
           <span class="message-time">${timeStr}</span>
         </div>
@@ -4183,10 +4247,11 @@
             bodyStyle = ' style="color: var(--green);"';
           }
           
-          const parsedText = parseMentions(escapeHtml(reply.text));
+          const parsedText = renderMessageText(reply.text);
           
           replyDiv.innerHTML = `
             <div class="message-header">
+              <span class="message-avatar">${getInitials(reply.author)}</span>
               <span class="message-author ${reply.authorType}">${formatName(reply.author)}</span>
               <span class="message-time">${reply.time}</span>
             </div>
@@ -4233,9 +4298,40 @@
     function formatName(name) {
       return name;
     }
+
+    function getInitials(name) {
+      return name.replace(/^~/, '').substring(0, 2).toUpperCase();
+    }
+
+    function getLatestMessageInTree(noteId) {
+      let latest = null;
+      let latestTime = -1;
+      const walk = (n) => {
+        if (!n) return;
+        if (n.messages && n.messages.length > 0) {
+          const msg = n.messages[n.messages.length - 1];
+          const t = timeToMinutes(msg.time || '00:00');
+          if (t >= latestTime) { latestTime = t; latest = { msg, noteName: n.name }; }
+        }
+        if (n.children) n.children.forEach(cid => walk(notes[cid]));
+      };
+      walk(notes[noteId]);
+      return latest;
+    }
+
+    function timeToMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function shouldGroup(prevMsg, currMsg) {
+      if (!prevMsg || prevMsg.author !== currMsg.author) return false;
+      const diff = timeToMinutes(currMsg.time) - timeToMinutes(prevMsg.time);
+      return diff >= 0 && diff <= 7;
+    }
     
     function renderMessageText(text) {
-      return parseMentions(escapeHtml(text));
+      return parseMentions(escapeHtml(text).replace(/\n/g, '<br>'));
     }
 
     function parseMentions(text) {
@@ -6509,6 +6605,7 @@ export { authenticateUser };`
       // Clear and load messages for this note
       const messagesContainer = document.getElementById('chatMessages');
       messagesContainer.innerHTML = '';
+      lastRenderedMsg = null;
       
       // Reset threads for this note view
       threads = {};
@@ -6705,18 +6802,43 @@ export { authenticateUser };`
       if (hasChildren) {
         const arrowChar = isExpanded ? '▼' : '▶';
         arrowHtml = `<span class="note-expand-arrow" onclick="event.stopPropagation(); toggleNoteExpand('${note.id}')">${arrowChar}</span>`;
-      } else {
-        arrowHtml = `<span class="note-expand-arrow-spacer"></span>`;
       }
-      
-      let html = `
-        <div class="note-item ${nestedClass} ${activeClass} ${notifClass}" data-note-id="${note.id}" onclick="openNote('${note.id}')" oncontextmenu="showNoteContextMenu(event, '${note.id}')">
-          ${arrowHtml}
-          <span class="note-item-name ${nameColorClass}">${note.name}</span>
-          <span class="note-item-notification"></span>
-        </div>
-      `;
-      
+
+      // Preview for top-level notes
+      let sourceHtml = '';
+      let previewHtml = '';
+      if (isTopLevel) {
+        const latest = getLatestMessageInTree(note.id);
+        if (latest) {
+          const previewText = escapeHtml((latest.msg.text || '').replace(/\n/g, ' ').substring(0, 50));
+          const previewAuthor = escapeHtml(latest.msg.author || '');
+          sourceHtml = `<span class="note-item-source">${escapeHtml(latest.noteName)}</span>`;
+          previewHtml = `<span class="note-item-preview"><span class="note-item-preview-author">${previewAuthor}:</span> ${previewText}</span>`;
+        }
+      }
+
+      let html;
+      if (isTopLevel) {
+        html = `
+          <div class="note-item ${activeClass} ${notifClass}" data-note-id="${note.id}" onclick="openNote('${note.id}')" ${hasChildren ? `ondblclick="event.stopPropagation(); toggleNoteExpand('${note.id}')"` : ''} oncontextmenu="showNoteContextMenu(event, '${note.id}')">
+            ${arrowHtml || '<span class="note-expand-arrow-spacer"></span>'}
+            <span class="note-avatar">${getInitials(note.name)}</span>
+            <div class="note-item-content">
+              <span class="note-item-name ${nameColorClass}">${note.name}</span>
+              ${sourceHtml}
+              ${previewHtml}
+            </div>
+            <span class="note-item-notification"></span>
+          </div>`;
+      } else {
+        html = `
+          <div class="note-item ${nestedClass} ${activeClass} ${notifClass}" data-note-id="${note.id}" onclick="openNote('${note.id}')" ${hasChildren ? `ondblclick="event.stopPropagation(); toggleNoteExpand('${note.id}')"` : ''} oncontextmenu="showNoteContextMenu(event, '${note.id}')">
+            ${arrowHtml || '<span class="note-expand-arrow-spacer"></span>'}
+            <span class="note-item-name ${nameColorClass}">${note.name}</span>
+            <span class="note-item-notification"></span>
+          </div>`;
+      }
+
       // Render children only if expanded
       if (hasChildren && isExpanded) {
         note.children.forEach(childId => {
@@ -7198,16 +7320,25 @@ export { authenticateUser };`
     // Handle note being shared (moved under shared note)
     socket.on('noteShared', (data) => {
       console.log('Note shared:', data);
-      const { note, dm, fromUser } = data;
-      
-      // Add/update the shared note parent
+      const { note, dm, fromUser, oldParentId, offspring } = data;
+
+      // Remove note from old parent's children in local state
+      if (oldParentId && notes[oldParentId]) {
+        notes[oldParentId].children = (notes[oldParentId].children || []).filter(id => id !== note.id);
+      }
+
+      // Add/update the DM, the moved note, and all offspring
       notes[dm.id] = dm;
-      
-      // Add/update the nested note
       notes[note.id] = note;
-      
+      if (offspring) {
+        offspring.forEach(n => { notes[n.id] = n; });
+      }
+
       renderNotesList();
-      
+
+      // Notify on the DM so both users know the share happened
+      addNotification(dm.id);
+
       // Expand shared section
       if (!expandedSections.shared) {
         toggleSection('shared');
