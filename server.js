@@ -727,21 +727,21 @@ io.on('connection', (socket) => {
   });
   
   // --------------------------------------------
-  // SHARE NOTE WITH USER (move notebook under DM)
+  // SHARE NOTE WITH USER (move note under DM)
   // --------------------------------------------
   socket.on('shareNoteWithUser', (data) => {
     const user = state.users.get(socket.id);
     if (!user) return;
-    
+
     const { noteId, userName, dmId } = data;
     const note = state.notes[noteId];
-    
     if (!note) return;
-    
+
+    const oldParentId = note.parent || null;
+
     // Find or create the DM
     let dm = state.notes[dmId];
     if (!dm) {
-      // Create the DM
       dm = {
         id: dmId,
         name: userName,
@@ -757,49 +757,39 @@ io.on('connection', (socket) => {
       };
       state.notes[dmId] = dm;
     }
-    
+
     // Remove note from old parent
-    if (note.parent && state.notes[note.parent]) {
-      const idx = state.notes[note.parent].children.indexOf(noteId);
-      if (idx > -1) state.notes[note.parent].children.splice(idx, 1);
+    if (oldParentId && state.notes[oldParentId]) {
+      const idx = state.notes[oldParentId].children.indexOf(noteId);
+      if (idx > -1) state.notes[oldParentId].children.splice(idx, 1);
     }
-    
+
     // Move note under DM
     note.parent = dmId;
     if (!dm.children) dm.children = [];
-    if (!dm.children.includes(noteId)) {
-      dm.children.push(noteId);
-    }
-    
-    // Add users to the note AND all its children
+    if (!dm.children.includes(noteId)) dm.children.push(noteId);
+
+    // Add both users to the note and all its children
     addUserToNoteTree(noteId, user.name);
     addUserToNoteTree(noteId, userName);
-    
-    console.log(`${user.name} shared note ${noteId} with ${userName}, moved under DM ${dmId}`);
-    
-    // Notify the sharer (update their view)
+
+    console.log(`${user.name} moved note ${noteId} under DM ${dmId} (old parent: ${oldParentId})`);
+
+    // Notify the sharer — include oldParentId and all offspring so client can clean up Notes section
+    const allOffspring = collectNoteTree(noteId);
+    const offspring = allOffspring.filter(n => n.id !== noteId);
     const sharerDm = { ...dm, name: userName };
-    socket.emit('noteShared', { 
-      note: note, 
-      dm: sharerDm 
-    });
-    
-    // Notify the recipient (all their sessions) - send DM, note, and all children
+    socket.emit('noteShared', { note, dm: sharerDm, oldParentId, offspring });
+
+    // Notify the recipient
     const recipientDm = { ...dm, name: user.name };
-    emitToUser(userName, 'noteShared', { 
-      note: note, 
-      dm: recipientDm,
-      fromUser: user.name
-    });
-    
-    // Send all children of the shared note
+    emitToUser(userName, 'noteShared', { note, dm: recipientDm, fromUser: user.name });
+
+    // Send all children of the moved note to recipient
     const allNotes = collectNoteTree(noteId);
     allNotes.forEach(n => {
       if (n.id !== noteId) {
-        emitToUser(userName, 'noteInvite', {
-          note: n,
-          fromUser: user.name
-        });
+        emitToUser(userName, 'noteInvite', { note: n, fromUser: user.name });
       }
     });
   });
@@ -982,12 +972,14 @@ io.on('connection', (socket) => {
       
       if (existingDM) {
         // NEST under existing DM
+        const oldParentId = note.parent || null;
+
         // Remove from old parent
-        if (note.parent && state.notes[note.parent]) {
-          const idx = state.notes[note.parent].children.indexOf(noteId);
-          if (idx > -1) state.notes[note.parent].children.splice(idx, 1);
+        if (oldParentId && state.notes[oldParentId]) {
+          const idx = state.notes[oldParentId].children.indexOf(noteId);
+          if (idx > -1) state.notes[oldParentId].children.splice(idx, 1);
         }
-        
+
         // Move under DM
         note.parent = existingDM.id;
         note.type = 'dm';
@@ -995,28 +987,31 @@ io.on('connection', (socket) => {
         if (!existingDM.children.includes(noteId)) {
           existingDM.children.push(noteId);
         }
-        
+
         // Add users to note tree
         addUserToNoteTree(noteId, user.name);
         addUserToNoteTree(noteId, inviteeName);
-        
+
         console.log(`Nested note ${noteId} under existing DM ${existingDM.id}`);
-        
-        // Send noteShared to inviter
+
+        // Send noteShared to inviter — include oldParentId and offspring for cleanup
+        const offspring = collectNoteTree(noteId).filter(n => n.id !== noteId);
         const sharerDm = { ...existingDM, name: inviteeName };
-        socket.emit('noteShared', { 
-          note: note, 
-          dm: sharerDm 
+        socket.emit('noteShared', {
+          note: note,
+          dm: sharerDm,
+          oldParentId,
+          offspring
         });
-        
+
         // Send to invitee (all their sessions)
         const recipientDm = { ...existingDM, name: user.name };
-        emitToUser(inviteeName, 'noteShared', { 
-          note: note, 
+        emitToUser(inviteeName, 'noteShared', {
+          note: note,
           dm: recipientDm,
           fromUser: user.name
         });
-        
+
         // Send children
         const allNotes = collectNoteTree(noteId);
         allNotes.forEach(n => {
